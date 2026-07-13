@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FST RH App",
-  description: "Application de gestion RH pour la FST",
+  title: "FST RH — Gestion des Ressources Humaines",
+  description: "Système de gestion RH — FST Mohammedia",
 };
 
 export default function RootLayout({

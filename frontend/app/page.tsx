@@ -1,71 +1,146 @@
 import { getApiHealth } from "@/lib/api";
 
-const modules = [
-  { name: "Employes", description: "Profils, contrats et informations administratives." },
-  { name: "Conges", description: "Demandes, validations et historique des absences." },
-  { name: "Departements", description: "Organisation interne, equipes et responsables." },
-  { name: "Tableau de bord", description: "Indicateurs RH et suivi des activites." },
-];
-
 export default async function Home() {
   const health = await getApiHealth();
   const apiOnline = health?.status === "ok";
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
-      <section className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-teal-700">FST RH</p>
-            <h1 className="mt-2 text-3xl font-semibold">Espace de gestion RH</h1>
-            <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-              Base propre pour commencer le developpement: Laravel API, Next.js et MySQL.
-            </p>
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-sm text-slate-500">API</p>
-            <p className={apiOnline ? "font-semibold text-emerald-700" : "font-semibold text-rose-700"}>
-              {apiOnline ? "Connectee" : "Indisponible"}
-            </p>
-          </div>
-        </div>
-      </section>
+    <main style={{
+      minHeight: "100vh",
+      backgroundColor: "#f9fafb",
+      fontFamily: "Inter, system-ui, sans-serif",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "2rem",
+    }}>
 
-      <section className="mx-auto grid max-w-6xl gap-6 px-6 py-8 lg:grid-cols-[1.5fr_1fr]">
-        <div>
-          <h2 className="text-xl font-semibold">Modules a developper</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            {modules.map((module) => (
-              <article key={module.name} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <h3 className="font-semibold">{module.name}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{module.description}</p>
-              </article>
+      <div style={{
+        backgroundColor: "#ffffff",
+        border: "1px solid #e5e7eb",
+        borderRadius: "12px",
+        padding: "3rem 3.5rem",
+        maxWidth: "600px",
+        width: "100%",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)",
+      }}>
+
+        {/* Logo / Icon */}
+        <div style={{
+          width: "48px",
+          height: "48px",
+          backgroundColor: "#1d4ed8",
+          borderRadius: "10px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: "1.5rem",
+        }}>
+          <svg width="24" height="24" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+        </div>
+
+        {/* Institution */}
+        <p style={{
+          fontSize: "0.75rem",
+          fontWeight: 600,
+          color: "#6b7280",
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          marginBottom: "0.5rem",
+        }}>
+          Faculté des Sciences et Techniques — Mohammedia
+        </p>
+
+        {/* Title */}
+        <h1 style={{
+          fontSize: "1.75rem",
+          fontWeight: 700,
+          color: "#111827",
+          margin: "0 0 0.75rem 0",
+          lineHeight: 1.3,
+        }}>
+          Système de Gestion RH
+        </h1>
+
+        {/* Description */}
+        <p style={{
+          fontSize: "0.95rem",
+          color: "#6b7280",
+          lineHeight: 1.7,
+          margin: "0 0 2rem 0",
+        }}>
+          Plateforme de gestion des ressources humaines pour les professeurs
+          et les employés administratifs de la FST Mohammedia.
+        </p>
+
+        {/* Divider */}
+        <div style={{ height: "1px", backgroundColor: "#f3f4f6", marginBottom: "1.5rem" }} />
+
+        {/* Stack */}
+        <div style={{ marginBottom: "2rem" }}>
+          <p style={{ fontSize: "0.75rem", color: "#9ca3af", marginBottom: "0.75rem", fontWeight: 500 }}>
+            STACK TECHNIQUE
+          </p>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            {["Laravel 11", "Next.js 16", "MySQL 8", "Docker"].map((tech) => (
+              <span key={tech} style={{
+                fontSize: "0.8rem",
+                color: "#374151",
+                backgroundColor: "#f3f4f6",
+                border: "1px solid #e5e7eb",
+                borderRadius: "6px",
+                padding: "0.25rem 0.75rem",
+                fontWeight: 500,
+              }}>
+                {tech}
+              </span>
             ))}
           </div>
         </div>
 
-        <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-semibold">Etat technique</h2>
-          <dl className="mt-4 space-y-4 text-sm">
-            <div>
-              <dt className="text-slate-500">Backend</dt>
-              <dd className="font-medium">Laravel API</dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Frontend</dt>
-              <dd className="font-medium">Next.js + TypeScript</dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Database</dt>
-              <dd className="font-medium">{health?.database ?? "mysql"}</dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Endpoint</dt>
-              <dd className="break-all font-mono text-xs">/api/health</dd>
-            </div>
-          </dl>
-        </aside>
-      </section>
+        {/* API Status */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          padding: "0.75rem 1rem",
+          backgroundColor: apiOnline ? "#f0fdf4" : "#fef2f2",
+          border: `1px solid ${apiOnline ? "#bbf7d0" : "#fecaca"}`,
+          borderRadius: "8px",
+        }}>
+          <div style={{
+            width: "8px",
+            height: "8px",
+            borderRadius: "50%",
+            backgroundColor: apiOnline ? "#16a34a" : "#dc2626",
+            flexShrink: 0,
+          }} />
+          <span style={{
+            fontSize: "0.85rem",
+            color: apiOnline ? "#15803d" : "#dc2626",
+            fontWeight: 500,
+          }}>
+            API {apiOnline ? "connectée et opérationnelle" : "non disponible"}
+          </span>
+        </div>
+
+      </div>
+
+      {/* Footer */}
+      <p style={{
+        marginTop: "2rem",
+        fontSize: "0.75rem",
+        color: "#9ca3af",
+      }}>
+        FST Mohammedia — {new Date().getFullYear()}
+      </p>
+
     </main>
   );
 }
