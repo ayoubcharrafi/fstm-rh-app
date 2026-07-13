@@ -1,0 +1,25 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Dependencies
+backend/vendor/
+frontend/node_modules/
+
+# Build output
+frontend/.next/
+frontend/out/
+backend/public/build/
+backend/storage/framework/views/*.php
+
+# Runtime and cache
+backend/storage/logs/*.log
+backend/.phpunit.result.cache
+.DS_Store
+Thumbs.db
+
+
+# IDE
+.vscode/
+.idea/

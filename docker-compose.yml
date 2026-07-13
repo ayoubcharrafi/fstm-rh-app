@@ -1,0 +1,71 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: fst_backend
+    working_dir: /var/www/html
+    volumes:
+      - ./backend:/var/www/html
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      APP_URL: http://localhost:8000
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: fst_rh_db
+      DB_USERNAME: fst_user
+      DB_PASSWORD: fst_password
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: fst_frontend
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      API_INTERNAL_URL: http://backend:8000/api
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api
+
+  mysql:
+    image: mysql:8.4
+    container_name: fst_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: fst_rh_db
+      MYSQL_USER: fst_user
+      MYSQL_PASSWORD: fst_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: fst_phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
