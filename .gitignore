@@ -23,3 +23,5 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+# Local project documentation
+CAHIER_DES_CHARGES_DETAILLE.md
