@@ -3,6 +3,7 @@ services:
     build:
       context: ./backend
     container_name: fst_backend
+    restart: unless-stopped
     working_dir: /var/www/html
     volumes:
       - ./backend:/var/www/html
@@ -24,6 +25,7 @@ services:
     build:
       context: ./frontend
     container_name: fst_frontend
+    restart: unless-stopped
     working_dir: /app
     volumes:
       - ./frontend:/app
@@ -32,8 +34,9 @@ services:
     depends_on:
       - backend
     environment:
-      API_INTERNAL_URL: http://backend:8000/api
-      NEXT_PUBLIC_API_URL: http://localhost:8000/api
+      API_INTERNAL_URL: http://backend:8000/api/v1
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+      NODE_OPTIONS: "--max-old-space-size=4096"
 
   mysql:
     image: mysql:8.4
