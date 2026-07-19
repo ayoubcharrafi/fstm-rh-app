@@ -15,6 +15,22 @@ use Illuminate\Support\Facades\DB;
 
 class RequestController extends Controller
 {
+    /**
+     * Payload fields that must be filled before a request can be submitted,
+     * keyed by document type code. Keep in sync with the frontend form
+     * (frontend/app/requests/new/page.tsx → PayloadFields).
+     *
+     * @var array<string, array<int, string>>
+     */
+    private const REQUIRED_PAYLOAD_FIELDS = [
+        'ODM'        => ['destination', 'objet', 'date_debut', 'date_fin'],
+        'AQT'        => ['destination', 'date_debut', 'date_fin'],
+        'ATT-HAB'    => ['date_habilitation'],
+        'PV-REPRISE' => ['type_conge', 'date_debut', 'date_fin', 'date_reprise'],
+        'CONGE-ADM'  => ['date_debut', 'date_fin', 'date_reprise'],
+        'CARTE-NOT'  => ['annee_evaluation'],
+    ];
+
     public function __construct(
         private AuditService $audit,
         private NotificationService $notif,
@@ -120,6 +136,15 @@ class RequestController extends Controller
             return response()->json(['message' => 'Forbidden.'], 403);
         }
 
+        // Enforce that all required payload fields are filled before submitting.
+        $missing = $this->missingRequiredFields($documentRequest);
+        if (! empty($missing)) {
+            return response()->json([
+                'message' => 'Veuillez remplir tous les champs obligatoires avant de soumettre la demande.',
+                'errors'  => ['payload' => $missing],
+            ], 422);
+        }
+
         return $this->transition($request, $documentRequest, RequestStatus::EnAttente, function ($dr) {
             DB::transaction(function () use ($dr) {
                 // Generate real reference at submission time
@@ -135,6 +160,29 @@ class RequestController extends Controller
                 "Votre demande {$dr->reference} a été soumise et est en attente de traitement."
             );
         });
+    }
+
+    /**
+     * Return the list of required payload fields that are empty for this
+     * request's document type. Empty list means the request is complete.
+     *
+     * @return array<int, string>
+     */
+    private function missingRequiredFields(DocumentRequest $documentRequest): array
+    {
+        $code     = $documentRequest->documentType->code ?? null;
+        $required = self::REQUIRED_PAYLOAD_FIELDS[$code] ?? [];
+        $payload  = $documentRequest->payload ?? [];
+
+        $missing = [];
+        foreach ($required as $field) {
+            $value = $payload[$field] ?? null;
+            if ($value === null || (is_string($value) && trim($value) === '')) {
+                $missing[] = $field;
+            }
+        }
+
+        return $missing;
     }
 
     public function cancel(Request $request, DocumentRequest $documentRequest): JsonResponse

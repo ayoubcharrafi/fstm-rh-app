@@ -11,6 +11,22 @@ import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/Badge';
 import type { DocumentRequest, RequestFile } from '@/lib/types';
 
+// Identity fields (name, grade, matricule, recruitment date…) used to be copied
+// into the request payload. They belong to the requester's profile, not the
+// request, so we hide them here — this also removes empty leftovers like
+// "date recrutement: NULL" from older requests still carrying those keys.
+const HIDDEN_PAYLOAD_KEYS = new Set([
+  'nom_fr', 'prenom_fr', 'nom_ar', 'prenom_ar',
+  'grade_fr', 'grade_ar', 'doti', 'unite_fr', 'date_recrutement',
+]);
+
+function visiblePayloadEntries(payload: Record<string, unknown> | null | undefined) {
+  if (!payload) return [];
+  return Object.entries(payload).filter(([k, v]) =>
+    !HIDDEN_PAYLOAD_KEYS.has(k) && v !== null && v !== '' && v !== undefined
+  );
+}
+
 export default function AdminRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
@@ -68,7 +84,8 @@ export default function AdminRequestDetailPage() {
       const res = await api.get(`/documents/${file.id}/download`, { responseType: 'blob' });
       const url = URL.createObjectURL(res.data as Blob);
       const a = document.createElement('a');
-      a.href = url; a.download = file.original_name; a.click();
+      // Strip path separators so references like "ATT-TRAV-FR/0001/2026.pdf" download correctly.
+      a.href = url; a.download = file.original_name.replace(/[/\\]/g, '-'); a.click();
       URL.revokeObjectURL(url);
     } catch (e) { toast.error(getApiError(e)); }
   };
@@ -78,6 +95,13 @@ export default function AdminRequestDetailPage() {
 
   const generatedFiles = req.files?.filter(f => f.type === 'GENERE') ?? [];
   const signedFiles    = req.files?.filter(f => f.type === 'SIGNE') ?? [];
+
+  // Some document types (e.g. attestation de salaire) are not generated from a
+  // template — the administration fills them externally and only uploads the
+  // finished PDF. Keep this list in sync with the backend
+  // (DocumentController::MANUAL_UPLOAD_TYPES).
+  const MANUAL_UPLOAD_TYPES = ['ATT-SAL'];
+  const isManualUpload = MANUAL_UPLOAD_TYPES.includes(req.document_type?.code ?? '');
 
   return (
     <AppShell>
@@ -103,14 +127,14 @@ export default function AdminRequestDetailPage() {
           <div className="lg:col-span-2 flex flex-col gap-6">
 
             {/* Payload */}
-            {req.payload && Object.keys(req.payload).length > 0 && (
+            {visiblePayloadEntries(req.payload).length > 0 && (
               <Card>
                 <div className="border-b border-gray-100 px-6 py-4">
                   <p className="font-semibold text-gray-900">Informations de la demande</p>
                 </div>
                 <CardBody>
                   <dl className="grid grid-cols-2 gap-4">
-                    {Object.entries(req.payload).map(([k, v]) => (
+                    {visiblePayloadEntries(req.payload).map(([k, v]) => (
                       <div key={k}>
                         <dt className="text-xs font-medium uppercase tracking-wide text-gray-400">{k.replace(/_/g, ' ')}</dt>
                         <dd className="mt-1 text-sm text-gray-700">{String(v)}</dd>
@@ -190,12 +214,22 @@ export default function AdminRequestDetailPage() {
                 {/* Step 3 — generate PDF */}
                 {req.status === 'VALIDEE' && (
                   <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between rounded-lg bg-green-50 px-4 py-3">
-                      <p className="text-sm text-green-800">Demande validée — générez le document PDF.</p>
-                      <Button size="sm" loading={generateMutation.isPending} onClick={() => generateMutation.mutate()}>
-                        Générer PDF
-                      </Button>
-                    </div>
+                    {isManualUpload ? (
+                      <div className="rounded-lg bg-amber-50 px-4 py-3">
+                        <p className="text-sm text-amber-800">
+                          Ce document est traité manuellement par l&apos;administration
+                          (aucune génération automatique). Remplissez le document en dehors
+                          de l&apos;application, puis téléversez le PDF signé ci-dessous.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between rounded-lg bg-green-50 px-4 py-3">
+                        <p className="text-sm text-green-800">Demande validée — générez le document PDF.</p>
+                        <Button size="sm" loading={generateMutation.isPending} onClick={() => generateMutation.mutate()}>
+                          Générer PDF
+                        </Button>
+                      </div>
+                    )}
 
                     {/* Download generated */}
                     {generatedFiles.map(f => (
@@ -210,7 +244,11 @@ export default function AdminRequestDetailPage() {
 
                     {/* Upload signed */}
                     <div className="rounded-lg border border-dashed border-gray-300 p-4 text-center">
-                      <p className="text-sm text-gray-600 mb-2">Après signature, téléversez la version signée</p>
+                      <p className="text-sm text-gray-600 mb-2">
+                        {isManualUpload
+                          ? 'Téléversez le document rempli et signé (PDF)'
+                          : 'Après signature, téléversez la version signée'}
+                      </p>
                       <input
                         ref={fileInputRef}
                         type="file"

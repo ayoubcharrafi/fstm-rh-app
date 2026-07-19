@@ -13,6 +13,7 @@
         "barryvdh/laravel-dompdf": "^3.1",
         "laravel/framework": "^13.8",
         "laravel/tinker": "^3.0",
+        "mpdf/mpdf": "^8.3",
         "tymon/jwt-auth": "^2.3"
     },
     "require-dev":  {

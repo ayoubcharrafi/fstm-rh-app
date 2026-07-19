@@ -11,6 +11,21 @@ import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/Badge';
 import type { DocumentRequest, RequestFile } from '@/lib/types';
 
+// Identity fields belong to the profile, not the request payload. Hide them (and
+// any empty values) so leftovers like "date recrutement: NULL" from older
+// requests don't show up.
+const HIDDEN_PAYLOAD_KEYS = new Set([
+  'nom_fr', 'prenom_fr', 'nom_ar', 'prenom_ar',
+  'grade_fr', 'grade_ar', 'doti', 'unite_fr', 'date_recrutement',
+]);
+
+function visiblePayloadEntries(payload: Record<string, unknown> | null | undefined) {
+  if (!payload) return [];
+  return Object.entries(payload).filter(([k, v]) =>
+    !HIDDEN_PAYLOAD_KEYS.has(k) && v !== null && v !== '' && v !== undefined
+  );
+}
+
 export default function RequestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -33,7 +48,8 @@ export default function RequestDetailPage() {
       const url = URL.createObjectURL(res.data as Blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = file.original_name;
+      // Strip path separators so references like "ATT-TRAV-FR/0001/2026.pdf" download correctly.
+      a.download = file.original_name.replace(/[/\\]/g, '-');
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -85,14 +101,14 @@ export default function RequestDetailPage() {
             )}
 
             {/* Payload */}
-            {req.payload && Object.keys(req.payload).length > 0 && (
+            {visiblePayloadEntries(req.payload).length > 0 && (
               <Card>
                 <div className="border-b border-gray-100 px-6 py-4">
                   <p className="font-semibold text-gray-900">Informations de la demande</p>
                 </div>
                 <CardBody>
                   <dl className="grid grid-cols-2 gap-4">
-                    {Object.entries(req.payload).map(([k, v]) => (
+                    {visiblePayloadEntries(req.payload).map(([k, v]) => (
                       <div key={k}>
                         <dt className="text-xs font-medium uppercase tracking-wide text-gray-400">{k.replace(/_/g, ' ')}</dt>
                         <dd className="mt-1 text-sm text-gray-700">{String(v)}</dd>

@@ -19,6 +19,15 @@ use Illuminate\Support\Str;
 
 class DocumentController extends Controller
 {
+    /**
+     * Document types that are NOT generated from a template. The administration
+     * fills these out on an external system and uploads the finished PDF via
+     * uploadSigned(). No "Générer PDF" step applies to them.
+     *
+     * @var array<int, string>
+     */
+    private const MANUAL_UPLOAD_TYPES = ['ATT-SAL'];
+
     public function __construct(
         private AuditService $audit,
         private NotificationService $notif,
@@ -67,9 +76,15 @@ class DocumentController extends Controller
 
         $fileContent = Storage::disk($document->disk)->get($document->path);
 
+        // Sanitize the download name: strip path separators and control chars so
+        // references like "ATT-TRAV-FR/0001/2026.pdf" don't break the download,
+        // and expose a UTF-8 (RFC 5987) variant for Arabic/accented file names.
+        $fallbackName = preg_replace('/[^\w.\- ]+/u', '_', str_replace(['/', '\\'], '-', $document->original_name));
+        $utf8Name     = rawurlencode($document->original_name);
+
         return response($fileContent, 200, [
             'Content-Type'        => $document->mime_type,
-            'Content-Disposition' => 'attachment; filename="' . $document->original_name . '"',
+            'Content-Disposition' => "attachment; filename=\"{$fallbackName}\"; filename*=UTF-8''{$utf8Name}",
             'Content-Length'      => $document->size,
         ]);
     }
@@ -81,6 +96,13 @@ class DocumentController extends Controller
     {
         if ($documentRequest->status !== RequestStatus::Validee) {
             return response()->json(['message' => 'Request must be in VALIDEE status to generate document.'], 422);
+        }
+
+        $documentRequest->loadMissing('documentType');
+        if (in_array($documentRequest->documentType?->code, self::MANUAL_UPLOAD_TYPES, true)) {
+            return response()->json([
+                'message' => 'Ce type de document est traité manuellement par l\'administration. Téléversez directement le document signé.',
+            ], 422);
         }
 
         // Remove any previously generated doc for this request

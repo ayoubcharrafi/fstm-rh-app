@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -10,23 +10,27 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import type { AuthUser, DocumentType } from '@/lib/types';
+import type { DocumentType } from '@/lib/types';
 
-// Pre-fill payload fields from user profile
-function buildPrefilledPayload(user: AuthUser | null): Record<string, string> {
-  const p = user?.staff_profile;
-  if (!p) return {};
-  return {
-    nom_fr:    p.nom_fr ?? '',
-    prenom_fr: p.prenom_fr ?? '',
-    nom_ar:    p.nom_ar ?? '',
-    prenom_ar: p.prenom_ar ?? '',
-    grade_fr:  p.grade?.intitule_fr ?? '',
-    grade_ar:  p.grade?.intitule_ar ?? '',
-    doti:      p.doti ?? '',
-    unite_fr:  p.organizational_unit?.nom_fr ?? '',
-    date_recrutement: p.date_recrutement ?? '',
-  };
+// Identity fields (name, grade, matricule, recruitment date…) are NOT part of
+// the payload: the backend reads them straight from the requester's profile
+// when generating the PDF. Keeping them out of the payload avoids leaking empty
+// profile values (e.g. "date recrutement: NULL") into the admin's request view.
+
+// Required payload fields per document type code.
+// Keep in sync with the backend (RequestController::REQUIRED_PAYLOAD_FIELDS).
+const REQUIRED_FIELDS: Record<string, string[]> = {
+  ODM:          ['destination', 'objet', 'date_debut', 'date_fin'],
+  AQT:          ['destination', 'date_debut', 'date_fin'],
+  'ATT-HAB':    ['date_habilitation'],
+  'PV-REPRISE': ['type_conge', 'date_debut', 'date_fin', 'date_reprise'],
+  'CONGE-ADM':  ['date_debut', 'date_fin', 'date_reprise'],
+  'CARTE-NOT':  ['annee_evaluation'],
+};
+
+function getMissingFields(typeCode: string, payload: Record<string, string>): string[] {
+  const required = REQUIRED_FIELDS[typeCode] ?? [];
+  return required.filter(k => !(payload[k] ?? '').toString().trim());
 }
 
 export default function NewRequestPage() {
@@ -36,11 +40,7 @@ export default function NewRequestPage() {
   const [selectedType, setSelectedType] = useState<DocumentType | null>(null);
   const [language, setLanguage]         = useState('fr');
   const [payload, setPayload]           = useState<Record<string, string>>({});
-
-  // Pre-fill when user profile is available
-  useEffect(() => {
-    setPayload(buildPrefilledPayload(user));
-  }, [user]);
+  const [showErrors, setShowErrors]     = useState(false);
 
   const { data: docTypes } = useQuery<DocumentType[]>({
     queryKey: ['document-types'],
@@ -80,6 +80,15 @@ export default function NewRequestPage() {
 
   const handleSubmit = async () => {
     if (!selectedType) return;
+
+    // Block submission until every required field is filled.
+    const missing = getMissingFields(selectedType.code, payload);
+    if (missing.length > 0) {
+      setShowErrors(true);
+      toast.error('Veuillez remplir tous les champs obligatoires avant de soumettre.');
+      return;
+    }
+
     const draft = await createMutation.mutateAsync({
       document_type_id: selectedType.id,
       language: selectedType.requires_language ? language : null,
@@ -91,6 +100,7 @@ export default function NewRequestPage() {
   const set = (key: string, value: string) =>
     setPayload(prev => ({ ...prev, [key]: value }));
 
+  const missingFields = selectedType ? getMissingFields(selectedType.code, payload) : [];
   const isLoading = createMutation.isPending || submitMutation.isPending;
 
   return (
@@ -116,7 +126,7 @@ export default function NewRequestPage() {
                     {allowedTypes.map(t => (
                       <li key={t.id}>
                         <button
-                          onClick={() => setSelectedType(t)}
+                          onClick={() => { setSelectedType(t); setShowErrors(false); }}
                           className={`w-full rounded-lg px-3 py-3 text-left text-sm transition-colors
                             ${selectedType?.id === t.id
                               ? 'bg-blue-50 text-blue-700 font-medium'
@@ -162,14 +172,14 @@ export default function NewRequestPage() {
                         Informations pré-remplies depuis votre profil
                       </p>
                       <div className="grid grid-cols-2 gap-3">
-                        <ReadonlyField label="Nom (FR)" value={payload.nom_fr} />
-                        <ReadonlyField label="Prénom (FR)" value={payload.prenom_fr} />
-                        {payload.nom_ar && <ReadonlyField label="الاسم" value={payload.nom_ar} dir="rtl" />}
-                        {payload.prenom_ar && <ReadonlyField label="الاسم الشخصي" value={payload.prenom_ar} dir="rtl" />}
-                        <ReadonlyField label="Grade" value={payload.grade_fr} />
-                        <ReadonlyField label="N° Matricule" value={payload.doti} />
-                        <ReadonlyField label="Département" value={payload.unite_fr} />
-                        <ReadonlyField label="Date de recrutement" value={payload.date_recrutement} />
+                        <ReadonlyField label="Nom (FR)" value={user?.staff_profile?.nom_fr} />
+                        <ReadonlyField label="Prénom (FR)" value={user?.staff_profile?.prenom_fr} />
+                        {user?.staff_profile?.nom_ar && <ReadonlyField label="الاسم" value={user.staff_profile.nom_ar} dir="rtl" />}
+                        {user?.staff_profile?.prenom_ar && <ReadonlyField label="الاسم الشخصي" value={user.staff_profile.prenom_ar} dir="rtl" />}
+                        {user?.staff_profile?.grade?.intitule_fr && <ReadonlyField label="Grade" value={user.staff_profile.grade.intitule_fr} />}
+                        {user?.staff_profile?.doti && <ReadonlyField label="N° Matricule" value={user.staff_profile.doti} />}
+                        {user?.staff_profile?.organizational_unit?.nom_fr && <ReadonlyField label="Département" value={user.staff_profile.organizational_unit.nom_fr} />}
+                        {user?.staff_profile?.date_recrutement && <ReadonlyField label="Date de recrutement" value={user.staff_profile.date_recrutement} />}
                       </div>
                     </div>
 
@@ -193,13 +203,22 @@ export default function NewRequestPage() {
                       typeCode={selectedType.code}
                       payload={payload}
                       onChange={set}
+                      showErrors={showErrors}
                     />
+
+                    {showErrors && missingFields.length > 0 && (
+                      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                        <p className="text-sm font-medium text-red-700">
+                          Veuillez remplir tous les champs obligatoires (*) avant de soumettre.
+                        </p>
+                      </div>
+                    )}
 
                     <div className="flex gap-3 border-t border-gray-100 pt-4">
                       <Button variant="secondary" onClick={handleSaveDraft} loading={createMutation.isPending && !submitMutation.isPending} disabled={isLoading}>
                         Enregistrer brouillon
                       </Button>
-                      <Button onClick={handleSubmit} loading={submitMutation.isPending} disabled={isLoading}>
+                      <Button onClick={handleSubmit} loading={submitMutation.isPending} disabled={isLoading || missingFields.length > 0}>
                         Soumettre la demande
                       </Button>
                     </div>
@@ -228,25 +247,39 @@ function PayloadFields({
   typeCode,
   payload,
   onChange,
+  showErrors = false,
 }: {
   typeCode: string;
   payload: Record<string, string>;
   onChange: (key: string, value: string) => void;
+  showErrors?: boolean;
 }) {
-  const f = (key: string, label: string, type = 'text', required = false) => (
-    <Input
-      key={key}
-      label={label + (required ? ' *' : '')}
-      type={type}
-      value={payload[key] ?? ''}
-      onChange={e => onChange(key, e.target.value)}
-    />
-  );
+  const f = (key: string, label: string, type = 'text', required = false) => {
+    const isMissing = required && showErrors && !(payload[key] ?? '').toString().trim();
+    return (
+      <Input
+        key={key}
+        label={label + (required ? ' *' : '')}
+        type={type}
+        value={payload[key] ?? ''}
+        onChange={e => onChange(key, e.target.value)}
+        error={isMissing ? ' ' : undefined}
+      />
+    );
+  };
 
-  if (['ATT-TRAV-FR', 'ATT-TRAV-AR', 'ATT-SAL', 'ATT-HAB'].includes(typeCode)) {
+  if (['ATT-TRAV-FR', 'ATT-TRAV-AR', 'ATT-SAL'].includes(typeCode)) {
     return (
       <div className="flex flex-col gap-3">
         <p className="text-sm text-gray-500">Aucun champ supplémentaire requis — vos informations de profil suffisent.</p>
+      </div>
+    );
+  }
+
+  if (typeCode === 'ATT-HAB') {
+    return (
+      <div className="grid grid-cols-2 gap-3">
+        {f('date_habilitation', "Date d'habilitation", 'date', true)}
       </div>
     );
   }
@@ -275,19 +308,17 @@ function PayloadFields({
   }
 
   if (typeCode === 'CARTE-NOT') {
+    // La carte de notation s'imprime vierge : seuls les champs d'identité (issus
+    // du profil) et l'année sont pré-remplis ; la notation est faite à la main
+    // par la hiérarchie. On ne demande donc que l'année d'évaluation.
     return (
       <div className="flex flex-col gap-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Critères de notation (sur 20)</p>
         <div className="grid grid-cols-2 gap-3">
           {f('annee_evaluation', "Année d'évaluation", 'number', true)}
-          {f('rang_echelon', 'Rang / Échelon')}
-          <ScoreInput label="Réalisation des tâches (/ 5)" max={5} value={payload.note_taches ?? ''} onChange={v => onChange('note_taches', v)} />
-          <ScoreInput label="Productivité (/ 5)" max={5} value={payload.note_productivite ?? ''} onChange={v => onChange('note_productivite', v)} />
-          <ScoreInput label="Organisation (/ 3)" max={3} value={payload.note_organisation ?? ''} onChange={v => onChange('note_organisation', v)} />
-          <ScoreInput label="Comportement professionnel (/ 4)" max={4} value={payload.note_comportement ?? ''} onChange={v => onChange('note_comportement', v)} />
-          <ScoreInput label="Recherche et innovation (/ 3)" max={3} value={payload.note_recherche ?? ''} onChange={v => onChange('note_recherche', v)} />
         </div>
-        <NoteTotal payload={payload} />
+        <p className="text-xs text-gray-500">
+          La carte est générée vierge (identité pré-remplie). Les notes sont attribuées manuellement par la hiérarchie.
+        </p>
       </div>
     );
   }
@@ -308,47 +339,13 @@ function PayloadFields({
       <div className="grid grid-cols-2 gap-3">
         {f('date_debut', 'Date de début', 'date', true)}
         {f('date_fin', 'Date de fin', 'date', true)}
-        {f('commentaire', 'Commentaire')}
+        {f('date_reprise', 'Date de reprise du travail', 'date', true)}
         <NbJours payload={payload} />
       </div>
     );
   }
 
   return null;
-}
-
-function ScoreInput({ label, max, value, onChange }: { label: string; max: number; value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-gray-700">{label}</label>
-      <input
-        type="number" min={0} max={max} step={0.5}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-      />
-    </div>
-  );
-}
-
-function NoteTotal({ payload }: { payload: Record<string, string> }) {
-  const total = ['note_taches', 'note_productivite', 'note_organisation', 'note_comportement', 'note_recherche']
-    .reduce((sum, k) => sum + (parseFloat(payload[k] ?? '0') || 0), 0);
-
-  const appreciation =
-    total >= 18 ? 'Très bien' :
-    total >= 15 ? 'Bien' :
-    total >= 12 ? 'Assez bien' :
-    total >= 10 ? 'Passable' : 'Insuffisant';
-
-  return (
-    <div className="col-span-2 rounded-lg bg-gray-50 px-4 py-3">
-      <span className="text-sm font-semibold text-gray-700">Total : </span>
-      <span className="text-lg font-bold text-blue-700">{total.toFixed(1)} / 20</span>
-      <span className="ml-3 text-sm text-gray-500">— {appreciation}</span>
-      <p className="text-xs text-gray-400 mt-1">Calculé automatiquement côté serveur à la validation.</p>
-    </div>
-  );
 }
 
 function NbJours({ payload }: { payload: Record<string, string> }) {

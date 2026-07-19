@@ -20,7 +20,8 @@ export default function DocumentsPage() {
       const url = URL.createObjectURL(res.data as Blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = file.original_name;
+      // Strip path separators so references like "ATT-TRAV-FR/0001/2026.pdf" download correctly.
+      a.download = file.original_name.replace(/[/\\]/g, '-');
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
