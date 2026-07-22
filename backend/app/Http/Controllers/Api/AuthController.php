@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Setting;
 use App\Services\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,12 +26,14 @@ class AuthController extends Controller
         ]);
 
         $key = 'login:' . $request->ip();
-        if (RateLimiter::tooManyAttempts($key, 5)) {
+        $maxAttempts = (int) Setting::get('security.login_max_attempts', 5);
+        $decaySeconds = (int) Setting::get('security.login_decay_seconds', 60);
+        if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
             return response()->json(['message' => 'Too many login attempts. Try again later.'], 429);
         }
 
         if (! $token = Auth::attempt($request->only('email', 'password'))) {
-            RateLimiter::hit($key, 60);
+            RateLimiter::hit($key, $decaySeconds);
             $this->audit->log('auth.login.failed', null, [], ['email' => $request->email], $request);
 
             throw ValidationException::withMessages(['email' => ['Invalid credentials.']]);
@@ -81,7 +84,7 @@ class AuthController extends Controller
         $request->validate([
             'token'    => ['required'],
             'email'    => ['required', 'email'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'string', 'min:' . Setting::passwordMin(), 'confirmed'],
         ]);
 
         $status = Password::reset(

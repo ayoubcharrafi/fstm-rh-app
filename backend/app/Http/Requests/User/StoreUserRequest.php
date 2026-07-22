@@ -3,6 +3,7 @@
 namespace App\Http\Requests\User;
 
 use Illuminate\Foundation\Http\FormRequest;
+use App\Models\Setting;
 
 class StoreUserRequest extends FormRequest
 {
@@ -12,7 +13,7 @@ class StoreUserRequest extends FormRequest
     {
         return [
             'email'    => ['required', 'email', 'unique:users'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['required', 'string', 'min:' . Setting::passwordMin()],
             'role'     => ['required', 'in:ADMIN,PROFESSEUR,EMPLOYE'],
         ];
     }

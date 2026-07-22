@@ -3,6 +3,7 @@
 namespace App\Http\Requests\User;
 
 use Illuminate\Foundation\Http\FormRequest;
+use App\Models\Setting;
 
 class UpdateUserRequest extends FormRequest
 {
@@ -14,7 +15,7 @@ class UpdateUserRequest extends FormRequest
 
         return [
             'email'    => ['sometimes', 'email', "unique:users,email,{$userId}"],
-            'password' => ['nullable', 'string', 'min:8'],
+            'password' => ['nullable', 'string', 'min:' . Setting::passwordMin()],
             'role'     => ['sometimes', 'in:ADMIN,PROFESSEUR,EMPLOYE'],
             'is_active'=> ['sometimes', 'boolean'],
         ];

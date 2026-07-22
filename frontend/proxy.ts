@@ -21,5 +21,7 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|robots.txt).*)'],
+  // Exclut les internes Next et tout fichier statique (chemin contenant une extension, ex. .png)
+  // pour que les assets de public/ (logo, etc.) soient servis sans passer par l'auth.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|robots.txt|.*\\..*).*)'],
 };

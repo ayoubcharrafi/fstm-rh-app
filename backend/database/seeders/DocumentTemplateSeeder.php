@@ -176,7 +176,7 @@ td.l{width:160px;font-weight:900;white-space:nowrap;text-align:right;}
 td.c{width:20px;text-align:center;font-weight:900;}
 td.v{font-weight:bold;text-align:right;}
 .cl{font-size:13pt;font-weight:bold;text-align:justify;line-height:2;margin-top:28px;direction:rtl;}
-.fd{text-align:right;margin-top:70px;font-size:11pt;font-weight:bold;direction:rtl;}
+.fd{text-align:left;margin-top:70px;font-size:11pt;font-weight:bold;direction:rtl;}
 </style></head><body>
 <div class="hb"><img class="hi" src="{{ asset.entete }}" /></div>
 <div class="title">شهادة العمل</div>
@@ -188,7 +188,7 @@ td.v{font-weight:bold;text-align:right;}
 <tr><td class="l">رقم التأجير</td><td class="c">:</td><td class="v">{{ user.doti }}</td></tr>
 </table>
 <p class="cl">تعمل بهذه المؤسسة و قد سلمت له(ا) هذه الشهادة بطلب منه(ا) للإدلاء بها عند الحاجة.</p>
-<div class="fd">{{ request.date_edition }} &nbsp; المحمدية في</div>
+<div class="fd">المحمدية في &nbsp;&nbsp; {{ request.date_edition }}</div>
 </body></html>
 HTML; }
 
@@ -238,7 +238,7 @@ td.l{width:160px;font-weight:900;white-space:nowrap;text-align:right;}
 td.c{width:20px;text-align:center;font-weight:900;}
 td.v{font-weight:bold;text-align:right;}
 .cl{font-size:13pt;font-weight:bold;text-align:justify;line-height:2;margin-top:28px;direction:rtl;}
-.fd{text-align:right;margin-top:70px;font-size:11pt;font-weight:bold;direction:rtl;}
+.fd{text-align:left;margin-top:70px;font-size:11pt;font-weight:bold;direction:rtl;}
 </style></head><body>
 <div class="hb"><img class="hi" src="{{ asset.entete }}" /></div>
 <div class="title">شهادة العمل</div>
@@ -250,7 +250,7 @@ td.v{font-weight:bold;text-align:right;}
 <tr><td class="l">رقم التأجير</td><td class="c">:</td><td class="v">{{ user.doti }}</td></tr>
 </table>
 <p class="cl">يعمل أستاذ(ة) باحث(ة) بهذه المؤسسة.<br><br>و قد سلمت له(ا) هذه الشهادة بطلب منه(ا) للإدلاء بها عند الحاجة.</p>
-<div class="fd">{{ request.date_edition }} &nbsp; المحمدية في</div>
+<div class="fd">المحمدية في &nbsp;&nbsp; {{ request.date_edition }}</div>
 </body></html>
 HTML; }
 
@@ -265,7 +265,7 @@ body{font-family:"DejaVu Sans",Arial,sans-serif;font-size:11.5pt;color:#000;padd
 .p{font-size:11.5pt;text-align:justify;line-height:1.7;margin-bottom:12px;}
 .intro{text-indent:40px;}
 .vu{font-weight:bold;}
-.red{color:#c00000;font-weight:bold;}
+.red{color:#000;font-weight:bold;}
 .decide{text-align:center;font-size:14pt;font-weight:900;text-decoration:underline;margin:18px 0 20px 0;}
 .art{font-weight:bold;}
 .art u{font-weight:900;}
@@ -273,7 +273,7 @@ table.f{width:100%;border-collapse:collapse;margin:6px 0 12px 0;}
 table.f td{font-weight:bold;font-size:11.5pt;padding:5px 0;vertical-align:top;line-height:1.6;}
 td.l{width:110px;font-weight:900;white-space:nowrap;}
 td.c{width:25px;font-weight:900;}
-td.v{color:#c00000;font-weight:bold;}
+td.v{color:#000;font-weight:bold;}
 .fd{text-align:right;margin-top:55px;font-size:11.5pt;}
 </style></head><body>
 <div class="hb"><img class="hi" src="{{ asset.entete }}" /></div>
@@ -305,7 +305,7 @@ body{font-family:"DejaVu Sans",Arial,sans-serif;font-size:11.5pt;color:#000;padd
 .p{font-size:11.5pt;text-align:justify;line-height:1.7;margin-bottom:12px;}
 .intro{text-indent:40px;}
 .vu{font-weight:bold;}
-.red{color:#c00000;font-weight:bold;}
+.red{color:#000;font-weight:bold;}
 .decide{text-align:center;font-size:14pt;font-weight:900;text-decoration:underline;margin:18px 0 20px 0;}
 .art{font-weight:bold;}
 .art u{font-weight:900;}
@@ -313,7 +313,7 @@ table.f{width:100%;border-collapse:collapse;margin:6px 0 12px 0;}
 table.f td{font-weight:bold;font-size:11.5pt;padding:5px 0;vertical-align:top;line-height:1.6;}
 td.l{width:110px;font-weight:900;white-space:nowrap;}
 td.c{width:25px;font-weight:900;}
-td.v{color:#c00000;font-weight:bold;}
+td.v{color:#000;font-weight:bold;}
 .fd{text-align:right;margin-top:55px;font-size:11.5pt;}
 </style></head><body>
 <div class="hb"><img class="hi" src="{{ asset.entete }}" /></div>
@@ -413,7 +413,7 @@ td.c{width:20px;text-align:center;font-weight:900;}
 td.v{font-weight:bold;text-align:right;}
 .p{font-size:14pt;font-weight:bold;text-align:right;line-height:2;margin-bottom:14px;direction:rtl;}
 .b{font-weight:900;}
-.fd{text-align:right;margin-top:40px;font-size:13pt;font-weight:bold;direction:rtl;}
+.fd{text-align:left;margin-top:40px;font-size:13pt;font-weight:bold;direction:rtl;}
 table.sig{width:100%;border-collapse:collapse;direction:rtl;margin-top:90px;}
 table.sig td{font-size:12pt;font-weight:bold;text-align:center;width:50%;}
 </style></head><body>
@@ -451,7 +451,7 @@ td.c{width:20px;text-align:center;font-weight:900;}
 td.v{font-weight:bold;text-align:right;}
 .p{font-size:14pt;font-weight:bold;text-align:justify;line-height:2.1;margin-bottom:16px;direction:rtl;}
 .b{font-weight:900;}
-.fd{text-align:right;margin-top:55px;font-size:13pt;font-weight:bold;direction:rtl;}
+.fd{text-align:left;margin-top:55px;font-size:13pt;font-weight:bold;direction:rtl;}
 </style></head><body>
 <div class="hb"><img class="hi" src="{{ asset.entete }}" /></div>
 <div class="title">رخصــة إداريــة</div>
@@ -472,27 +472,28 @@ HTML; }
     private function carteNotAr(): string { return <<<'HTML'
 <!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
 <style>
+@page { margin:1cm 1.2cm; size:A4 portrait; }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:"Amiri","DejaVu Sans",serif;font-size:10.5pt;color:#000;direction:rtl;text-align:right;}
-.head{text-align:center;line-height:1.7;margin-bottom:8px;}
-.head .l1{font-weight:900;font-size:12pt;}
-.head .l2{font-weight:bold;font-size:11pt;}
-.title{text-align:center;font-weight:900;font-size:13pt;margin:8px 0 12px 0;}
-.title .yr{color:#c00000;}
-table{width:100%;border-collapse:collapse;direction:rtl;margin-bottom:8px;}
-td,th{border:1px solid #000;padding:5px 8px;font-size:10.5pt;vertical-align:middle;}
-.bar{background:#e8e8e8;font-weight:900;font-size:11pt;text-align:center;}
+body{font-family:"Amiri","DejaVu Sans",serif;font-size:9pt;color:#000;direction:rtl;text-align:right;}
+.head{text-align:center;line-height:1.4;margin-bottom:5px;}
+.head .l1{font-weight:900;font-size:10.5pt;}
+.head .l2{font-weight:bold;font-size:9.5pt;}
+.title{text-align:center;font-weight:900;font-size:11pt;margin:5px 0 7px 0;}
+.title .yr{color:#000;}
+table{width:100%;border-collapse:collapse;direction:rtl;margin-bottom:5px;}
+td,th{border:1px solid #000;padding:2px 6px;font-size:9pt;vertical-align:middle;}
+.bar{background:#e8e8e8;font-weight:900;font-size:9.5pt;text-align:center;}
 .lbl{font-weight:bold;white-space:nowrap;}
-.red{color:#c00000;font-weight:bold;white-space:nowrap;}
-.rv{color:#c00000;font-weight:bold;}
+.red{color:#000;font-weight:bold;white-space:nowrap;}
+.rv{color:#000;font-weight:bold;}
 .ctr{text-align:center;font-weight:900;}
 .el{text-align:right;}
 .gh{background:#f0f0f0;font-weight:900;text-align:center;}
 .grade{text-align:center;}
-.mtag{text-align:center;font-weight:bold;font-size:9.5pt;line-height:1.5;}
-.mtag .g{font-size:11pt;font-weight:900;}
-.box{display:inline-block;width:11px;height:11px;border:1px solid #000;vertical-align:middle;margin-left:4px;}
-.hcell{font-weight:bold;height:26px;}
+.mtag{text-align:center;font-weight:bold;font-size:8.5pt;line-height:1.3;}
+.mtag .g{font-size:9.5pt;font-weight:900;}
+.box{display:inline-block;width:10px;height:10px;border:1px solid #000;vertical-align:middle;margin-left:4px;}
+.hcell{font-weight:bold;height:22px;}
 </style></head><body>
 
 <div class="head">
@@ -520,7 +521,7 @@ td,th{border:1px solid #000;padding:5px 8px;font-size:10.5pt;vertical-align:midd
   <td class="lbl">مكان الازدياد :</td><td></td>
 </tr>
 <tr>
-  <td class="red">الحالة العائلية :</td><td class="rv">{{ user.situation_familiale }}</td>
+  <td class="red">الحالة العائلية :</td><td class="rv">{{ user.situation_familiale_ar }}</td>
   <td class="lbl">عدد الأطفال :</td><td></td>
 </tr>
 <tr>
@@ -590,7 +591,7 @@ td,th{border:1px solid #000;padding:5px 8px;font-size:10.5pt;vertical-align:midd
 </tr>
 </table>
 
-<div style="margin-top:22px;font-weight:bold;font-size:10.5pt;">توقيع رئيس الإدارة</div>
+<div style="margin-top:14px;font-weight:bold;font-size:9.5pt;">توقيع رئيس الإدارة</div>
 
 </body></html>
 HTML; }

@@ -33,6 +33,63 @@ function getMissingFields(typeCode: string, payload: Record<string, string>): st
   return required.filter(k => !(payload[k] ?? '').toString().trim());
 }
 
+// Coherence checks beyond presence: valid dates, chronological order, no past
+// dates for missions/leaves, plausible year. Keep in sync with the backend
+// (RequestController::invalidPayloadFields). Returns field => error message.
+function getFieldErrors(typeCode: string, payload: Record<string, string>): Record<string, string> {
+  const errors: Record<string, string> = {};
+  const noPast = ['ODM', 'AQT', 'PV-REPRISE', 'CONGE-ADM'].includes(typeCode);
+
+  const parse = (key: string): Date | null => {
+    const raw = (payload[key] ?? '').toString().trim();
+    if (!raw) return null;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) {
+      errors[key] = 'Date invalide.';
+      return null;
+    }
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const debut   = 'date_debut' in payload ? parse('date_debut') : null;
+  const fin     = 'date_fin' in payload ? parse('date_fin') : null;
+  const reprise = 'date_reprise' in payload ? parse('date_reprise') : null;
+
+  if (noPast && debut && !errors.date_debut && debut < today) {
+    errors.date_debut = 'La date de début ne peut pas être dans le passé.';
+  }
+  if (debut && fin && !errors.date_debut && !errors.date_fin && fin < debut) {
+    errors.date_fin = 'La date de fin doit être postérieure ou égale à la date de début.';
+  }
+  if (reprise && fin && !errors.date_fin && !errors.date_reprise && reprise <= fin) {
+    errors.date_reprise = 'La date de reprise doit être postérieure à la date de fin.';
+  }
+
+  if (typeCode === 'ATT-HAB') {
+    const hab = parse('date_habilitation');
+    if (hab && !errors.date_habilitation && hab > today) {
+      errors.date_habilitation = "La date d'habilitation ne peut pas être dans le futur.";
+    }
+  }
+
+  if (typeCode === 'CARTE-NOT') {
+    const raw = (payload.annee_evaluation ?? '').toString().trim();
+    if (raw) {
+      const year = parseInt(raw, 10);
+      const max = new Date().getFullYear() + 1;
+      if (Number.isNaN(year) || year < 2000 || year > max) {
+        errors.annee_evaluation = `L'année doit être comprise entre 2000 et ${max}.`;
+      }
+    }
+  }
+
+  return errors;
+}
+
 export default function NewRequestPage() {
   const { user } = useAuth();
   const router   = useRouter();
@@ -89,6 +146,14 @@ export default function NewRequestPage() {
       return;
     }
 
+    // Block submission on incoherent data (bad dates, wrong order, etc.).
+    const fieldErrors = getFieldErrors(selectedType.code, payload);
+    if (Object.keys(fieldErrors).length > 0) {
+      setShowErrors(true);
+      toast.error('Certaines informations sont incohérentes. Veuillez les corriger.');
+      return;
+    }
+
     const draft = await createMutation.mutateAsync({
       document_type_id: selectedType.id,
       language: selectedType.requires_language ? language : null,
@@ -101,6 +166,8 @@ export default function NewRequestPage() {
     setPayload(prev => ({ ...prev, [key]: value }));
 
   const missingFields = selectedType ? getMissingFields(selectedType.code, payload) : [];
+  const fieldErrors = selectedType ? getFieldErrors(selectedType.code, payload) : {};
+  const hasErrors = Object.keys(fieldErrors).length > 0;
   const isLoading = createMutation.isPending || submitMutation.isPending;
 
   return (
@@ -204,6 +271,7 @@ export default function NewRequestPage() {
                       payload={payload}
                       onChange={set}
                       showErrors={showErrors}
+                      fieldErrors={fieldErrors}
                     />
 
                     {showErrors && missingFields.length > 0 && (
@@ -214,11 +282,19 @@ export default function NewRequestPage() {
                       </div>
                     )}
 
+                    {showErrors && hasErrors && (
+                      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                        <p className="text-sm font-medium text-red-700">
+                          Certaines informations sont incohérentes. Corrigez les champs signalés avant de soumettre.
+                        </p>
+                      </div>
+                    )}
+
                     <div className="flex gap-3 border-t border-gray-100 pt-4">
                       <Button variant="secondary" onClick={handleSaveDraft} loading={createMutation.isPending && !submitMutation.isPending} disabled={isLoading}>
                         Enregistrer brouillon
                       </Button>
-                      <Button onClick={handleSubmit} loading={submitMutation.isPending} disabled={isLoading || missingFields.length > 0}>
+                      <Button onClick={handleSubmit} loading={submitMutation.isPending} disabled={isLoading || missingFields.length > 0 || hasErrors}>
                         Soumettre la demande
                       </Button>
                     </div>
@@ -248,14 +324,17 @@ function PayloadFields({
   payload,
   onChange,
   showErrors = false,
+  fieldErrors = {},
 }: {
   typeCode: string;
   payload: Record<string, string>;
   onChange: (key: string, value: string) => void;
   showErrors?: boolean;
+  fieldErrors?: Record<string, string>;
 }) {
   const f = (key: string, label: string, type = 'text', required = false) => {
     const isMissing = required && showErrors && !(payload[key] ?? '').toString().trim();
+    const coherence = showErrors ? fieldErrors[key] : undefined;
     return (
       <Input
         key={key}
@@ -263,7 +342,7 @@ function PayloadFields({
         type={type}
         value={payload[key] ?? ''}
         onChange={e => onChange(key, e.target.value)}
-        error={isMissing ? ' ' : undefined}
+        error={coherence ?? (isMissing ? ' ' : undefined)}
       />
     );
   };

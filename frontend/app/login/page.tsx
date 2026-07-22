@@ -39,15 +39,12 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Header */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600">
-            <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-            </svg>
-          </div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-            FST Mohammedia
-          </p>
-          <h1 className="mt-1 text-2xl font-bold text-gray-900">Gestion RH</h1>
+          <img
+            src="/logo_FSTMohammedia.png"
+            alt="FST Mohammedia"
+            className="mx-auto mb-5 h-auto w-44 object-contain"
+          />
+          <h1 className="text-2xl font-bold text-gray-900">Gestion RH</h1>
           <p className="mt-1 text-sm text-gray-500">Connectez-vous à votre espace</p>
         </div>
 

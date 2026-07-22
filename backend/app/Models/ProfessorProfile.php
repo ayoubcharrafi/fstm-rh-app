@@ -15,8 +15,8 @@ class ProfessorProfile extends Model
     protected function casts(): array
     {
         return [
-            'date_prise_fonction' => 'date',
-            'date_habilitation'   => 'date',
+            'date_prise_fonction' => 'date:Y-m-d',
+            'date_habilitation'   => 'date:Y-m-d',
         ];
     }
 

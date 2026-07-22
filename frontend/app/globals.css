@@ -27,3 +27,19 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Animation d'entrée douce (fondu + léger glissement vers le haut). */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out both;
+}
+
+/* Réserve en permanence la gouttière de la barre de défilement pour éviter
+   que le contenu centré ne se décale quand la scrollbar apparaît/disparaît. */
+.scrollbar-stable {
+  scrollbar-gutter: stable;
+}

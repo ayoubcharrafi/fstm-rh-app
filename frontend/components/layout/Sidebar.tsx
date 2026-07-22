@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -40,8 +40,9 @@ const ADMIN_NAV_BOTTOM: NavItem[] = [
   { href: '/admin/grades',               label: 'Grades',             icon: icon('M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10') },
   { href: '/admin/organizational-units', label: 'Départements',       icon: icon('M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4') },
   { href: '/admin/documents',            label: 'Types de documents', icon: icon('M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z') },
-  { href: '/notifications',              label: 'Notifications',      icon: icon('M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9') },
+  { href: '/admin/notifications',       label: 'Notifications',      icon: icon('M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9') },
   { href: '/admin/audit',                label: "Journal d'audit",    icon: icon('M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2') },
+  { href: '/admin/settings',             label: 'Paramètres',         icon: icon('M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z') },
   { href: '/profile',                    label: 'Mon profil',         icon: icon('M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z') },
 ];
 
@@ -59,10 +60,25 @@ const USER_SUB: NavItem[] = [
   },
 ];
 
+const NOTIF_HREFS = new Set(['/notifications', '/admin/notifications']);
+
 export function Sidebar() {
   const pathname = usePathname();
   const router   = useRouter();
   const { user, isAdmin, logout } = useAuth();
+
+  // État replié, persisté dans localStorage.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    setCollapsed(localStorage.getItem('sidebar-collapsed') === '1');
+  }, []);
+  const toggleCollapsed = () => {
+    setCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('sidebar-collapsed', next ? '1' : '0');
+      return next;
+    });
+  };
 
   // Ouvrir le groupe si on est déjà sur une page utilisateur
   const usersGroupActive = pathname.startsWith('/admin/users') || pathname.startsWith('/admin/admins');
@@ -84,16 +100,29 @@ export function Sidebar() {
     const active =
       pathname === item.href ||
       (item.href !== '/dashboard' && item.href !== '/notifications' && item.href !== '/profile' && pathname.startsWith(item.href));
+    const isNotif = NOTIF_HREFS.has(item.href);
     return (
       <li>
         <Link
           href={item.href}
-          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors
+          title={collapsed ? item.label : undefined}
+          className={`group relative flex items-center gap-3 rounded-lg py-2 text-sm font-medium transition-colors
+            ${collapsed ? 'justify-center px-2' : 'px-3'}
             ${active ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
         >
-          {item.icon}
-          <span className="flex-1">{item.label}</span>
-          {item.href === '/notifications' && unread > 0 && (
+          {/* Barre colorée à gauche du lien actif */}
+          <span className={`absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-blue-600 transition-opacity ${active ? 'opacity-100' : 'opacity-0'}`} />
+          <span className="relative flex-shrink-0">
+            {item.icon}
+            {/* En replié, pastille non-lus posée sur l'icône */}
+            {isNotif && collapsed && unread > 0 && (
+              <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                {unread > 9 ? '9+' : unread}
+              </span>
+            )}
+          </span>
+          {!collapsed && <span className="flex-1">{item.label}</span>}
+          {isNotif && !collapsed && unread > 0 && (
             <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
               {unread > 99 ? '99+' : unread}
             </span>
@@ -104,22 +133,55 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="flex h-screen w-60 flex-col border-r border-gray-200 bg-white">
-      {/* Logo */}
-      <div className="flex items-center gap-3 border-b border-gray-100 px-5 py-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
-          <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.636 50.636 0 00-2.658-.813A59.906 59.906 0 0112 3.493a59.903 59.903 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A55.378 55.378 0 0112 8.443m-7.007 11.55A5.981 5.981 0 006.75 15.75v-1.5" />
-          </svg>
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-gray-900">FST RH</p>
-          <p className="text-xs text-gray-400">Mohammedia</p>
-        </div>
-      </div>
+    <aside className={`flex h-screen flex-col border-r border-gray-200 bg-white transition-[width] duration-200 ${collapsed ? 'w-16' : 'w-64'}`}>
+      {collapsed ? (
+        <>
+          {/* Logo compact + bouton déplier */}
+          <div className="flex flex-col items-center gap-2 border-b border-gray-100 px-2 py-4">
+            <Link href={isAdmin() ? '/admin/dashboard' : '/dashboard'} title="FST Mohammedia">
+              <img src="/logo_fst_mark.png" alt="FST" className="h-8 w-8 object-contain object-left" />
+            </Link>
+            <button
+              onClick={toggleCollapsed}
+              aria-label="Agrandir le menu"
+              title="Agrandir le menu"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Logo pleine largeur */}
+          <div className="border-b border-gray-100 px-4 pb-3 pt-4">
+            <div className="flex items-center justify-between gap-2">
+              <Link href={isAdmin() ? '/admin/dashboard' : '/dashboard'} title="FST Mohammedia" className="block min-w-0">
+                <img
+                  src="/logo_fst_mark.png"
+                  alt="Faculté des Sciences et Techniques de Mohammedia"
+                  className="h-9 w-auto object-contain"
+                />
+              </Link>
+              <button
+                onClick={toggleCollapsed}
+                aria-label="Réduire le menu"
+                title="Réduire le menu"
+                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-3">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3">
         {isAdmin() ? (
           <ul className="flex flex-col gap-0.5">
             {/* Top items */}
@@ -128,22 +190,27 @@ export function Sidebar() {
             {/* Groupe Utilisateurs avec dropdown */}
             <li>
               <button
-                onClick={() => setUsersOpen(v => !v)}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors
+                onClick={() => { if (collapsed) { toggleCollapsed(); setUsersOpen(true); } else { setUsersOpen(v => !v); } }}
+                title={collapsed ? 'Utilisateurs' : undefined}
+                className={`relative flex w-full items-center gap-3 rounded-lg py-2 text-sm font-medium transition-colors
+                  ${collapsed ? 'justify-center px-2' : 'px-3'}
                   ${usersGroupActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
               >
+                <span className={`absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-blue-600 transition-opacity ${usersGroupActive ? 'opacity-100' : 'opacity-0'}`} />
                 {icon('M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z')}
-                <span className="flex-1 text-left">Utilisateurs</span>
-                <svg
-                  className={`h-4 w-4 flex-shrink-0 transition-transform duration-200 ${usersOpen ? 'rotate-180' : ''}`}
-                  fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
+                {!collapsed && <span className="flex-1 text-left">Utilisateurs</span>}
+                {!collapsed && (
+                  <svg
+                    className={`h-4 w-4 flex-shrink-0 transition-transform duration-200 ${usersOpen ? 'rotate-180' : ''}`}
+                    fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                )}
               </button>
 
-              {/* Sous-menu */}
-              {usersOpen && (
+              {/* Sous-menu (masqué en replié) */}
+              {usersOpen && !collapsed && (
                 <ul className="mt-0.5 ml-3 flex flex-col gap-0.5 border-l-2 border-gray-100 pl-3">
                   {USER_SUB.map(sub => {
                     const active = pathname === sub.href || pathname.startsWith(sub.href + '/');
@@ -176,27 +243,51 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="border-t border-gray-100 p-3">
-        <div className="mb-2 rounded-lg bg-gray-50 px-3 py-2">
-          <p className="truncate text-xs font-medium text-gray-800">
-            {user?.staff_profile
-              ? `${user.staff_profile.prenom_fr} ${user.staff_profile.nom_fr}`
-              : user?.email}
-          </p>
-          <p className="truncate text-xs text-gray-400">{user?.email}</p>
-          <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium
-            ${isAdmin() ? 'bg-purple-100 text-purple-700' : user?.role === 'PROFESSEUR' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
-            {user?.role}
-          </span>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
-        >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          Se déconnecter
-        </button>
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-2">
+            <div
+              className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold
+                ${isAdmin() ? 'bg-purple-100 text-purple-700' : user?.role === 'PROFESSEUR' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}
+              title={user?.email}
+            >
+              {(user?.staff_profile?.prenom_fr?.[0] ?? user?.email?.[0] ?? '?').toUpperCase()}
+            </div>
+            <button
+              onClick={handleLogout}
+              title="Se déconnecter"
+              aria-label="Se déconnecter"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition-colors hover:bg-red-50"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="mb-2 rounded-lg bg-gray-50 px-3 py-2">
+              <p className="truncate text-xs font-medium text-gray-800">
+                {user?.staff_profile
+                  ? `${user.staff_profile.prenom_fr} ${user.staff_profile.nom_fr}`
+                  : user?.email}
+              </p>
+              <p className="truncate text-xs text-gray-400">{user?.email}</p>
+              <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium
+                ${isAdmin() ? 'bg-purple-100 text-purple-700' : user?.role === 'PROFESSEUR' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                {user?.role}
+              </span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              Se déconnecter
+            </button>
+          </>
+        )}
       </div>
     </aside>
   );

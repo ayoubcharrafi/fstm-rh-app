@@ -16,7 +16,7 @@ class EmployeeProfile extends Model
     protected function casts(): array
     {
         return [
-            'date_affectation' => 'date',
+            'date_affectation' => 'date:Y-m-d',
             'solde_conge'      => 'decimal:1',
             'conge_reporte'    => 'decimal:1',
         ];

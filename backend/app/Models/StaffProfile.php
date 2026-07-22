@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 
 class StaffProfile extends Model
 {
@@ -18,12 +19,19 @@ class StaffProfile extends Model
         'organizational_unit_id', 'photo_path',
     ];
 
+    protected $appends = ['photo_url'];
+
     protected function casts(): array
     {
         return [
-            'date_naissance'   => 'date',
-            'date_recrutement' => 'date',
+            'date_naissance'   => 'date:Y-m-d',
+            'date_recrutement' => 'date:Y-m-d',
         ];
+    }
+
+    public function getPhotoUrlAttribute(): ?string
+    {
+        return $this->photo_path ? Storage::disk('public')->url($this->photo_path) : null;
     }
 
     public function user(): BelongsTo

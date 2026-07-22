@@ -89,6 +89,8 @@ export interface StaffProfile {
   telephone: string | null;
   situation_administrative: string | null;
   date_recrutement: string | null;
+  photo_path: string | null;
+  photo_url: string | null;
   grade: Grade | null;
   organizational_unit: OrganizationalUnit | null;
   professor_profile: ProfessorProfile | null;
@@ -206,6 +208,50 @@ export interface AdminDashboard {
   users_by_role: Partial<Record<Role, number>>;
   active_users: number;
   requests_by_status: Partial<Record<RequestStatus, number>>;
-  monthly_requests: { month: string; total: number }[];
+  monthly_requests: { month: string; total: number; validated: number; rejected: number }[];
   avg_processing_hours: number;
+  kpis: {
+    total_requests: number;
+    pending: number;
+    in_progress: number;
+    backlog: number;
+    validated: number;
+    available: number;
+    rejected: number;
+    rejection_rate: number;
+    requests_last_30d: number;
+    requests_prev_30d: number;
+    total_users: number;
+    active_users: number;
+    inactive_users: number;
+    new_users_30d: number;
+  };
+  requests_by_type: { label: string; total: number }[];
+  requests_by_department: { label: string; total: number }[];
+  pipeline: {
+    submit_to_processing: number;
+    processing_to_decision: number;
+    decision_to_available: number;
+  };
+  files_stats: { attachments: number; generated: number; signed: number; total_size: number };
+  top_requesters: { name: string; total: number }[];
+  top_processors: { name: string; total: number }[];
+  recent_activity: {
+    id: number;
+    reference: string;
+    old_status: string | null;
+    new_status: string;
+    by: string;
+    at: string;
+  }[];
+  pending_queue: {
+    id: number;
+    reference: string;
+    requester: string;
+    document_type: string;
+    status: RequestStatus;
+    since: string | null;
+    age_hours: number;
+  }[];
+  stale_count: number;
 }

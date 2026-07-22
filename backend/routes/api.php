@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\DocumentTypeController;
@@ -9,6 +10,7 @@ use App\Http\Controllers\Api\GradeController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OrganizationalUnitController;
 use App\Http\Controllers\Api\RequestController;
+use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\StaffProfileController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\DB;
@@ -41,7 +43,14 @@ Route::prefix('v1')->group(function () {
 
         // Own profile
         Route::get('profile', [UserController::class, 'profile']);
+        Route::post('profile', [UserController::class, 'storeProfile']);
+        Route::patch('profile', [UserController::class, 'updateProfile']);
+        Route::post('profile/photo', [UserController::class, 'uploadPhoto']);
+        Route::delete('profile/photo', [UserController::class, 'deletePhoto']);
         Route::patch('profile/contact', [UserController::class, 'updateContact']);
+
+        // Mon compte
+        Route::post('account/password', [AccountController::class, 'changePassword']);
 
         // Referentials (read-only for all authenticated)
         Route::get('grades', [GradeController::class, 'index']);
@@ -117,6 +126,17 @@ Route::prefix('v1')->group(function () {
             // Dashboard & audit
             Route::get('dashboard', [DashboardController::class, 'admin']);
             Route::get('audit-logs', [DashboardController::class, 'auditLogs']);
+            Route::get('audit-logs/export', [DashboardController::class, 'auditExport']);
+            Route::delete('audit-logs', [DashboardController::class, 'auditPurge']);
+
+            // Paramètres plateforme
+            Route::get('settings', [SettingController::class, 'index']);
+            Route::put('settings', [SettingController::class, 'update']);
+            Route::delete('settings/read-notifications', [SettingController::class, 'purgeReadNotifications']);
+
+            // Notifications (diffusion & statistiques)
+            Route::get('notifications/stats', [NotificationController::class, 'adminStats']);
+            Route::post('notifications/broadcast', [NotificationController::class, 'broadcast']);
         });
     });
 });

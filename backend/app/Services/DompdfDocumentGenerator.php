@@ -241,6 +241,7 @@ class DompdfDocumentGenerator implements DocumentGeneratorInterface
             'user.date_recrutement'=> $profile?->date_recrutement?->format('d/m/Y') ?? '',
             'user.date_naissance'  => $profile?->date_naissance?->format('d/m/Y') ?? '',
             'user.situation_familiale' => $profile?->employeeProfile?->situation_familiale ?? '',
+            'user.situation_familiale_ar' => $this->situationFamilialeAr($profile?->employeeProfile?->situation_familiale),
             // Civility derived from sexe: F => Mme, otherwise Mr.
             'user.civilite_fr'     => (($profile?->sexe ?? '') === 'F') ? 'Mme' : 'Mr',
             'user.nom_complet_fr'  => trim(($profile?->prenom_fr ?? '') . ' ' . ($profile?->nom_fr ?? '')),
@@ -285,5 +286,16 @@ class DompdfDocumentGenerator implements DocumentGeneratorInterface
         $content = str_replace('{{asset.entete}}',   $dataUri, $content);
 
         return $content;
+    }
+
+    private function situationFamilialeAr(?string $value): string
+    {
+        return match ($value) {
+            'Célibataire' => 'أعزب',
+            'Marié(e)'    => 'متزوج(ة)',
+            'Divorcé(e)'  => 'مطلق(ة)',
+            'Veuf/Veuve'  => 'أرمل(ة)',
+            default       => $value ?? '',
+        };
     }
 }

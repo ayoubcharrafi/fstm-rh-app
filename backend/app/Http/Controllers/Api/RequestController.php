@@ -145,6 +145,15 @@ class RequestController extends Controller
             ], 422);
         }
 
+        // Enforce data coherence (valid dates, chronological order, plausible year…).
+        $invalid = $this->invalidPayloadFields($documentRequest);
+        if (! empty($invalid)) {
+            return response()->json([
+                'message' => 'Certaines informations sont incohérentes. Veuillez les corriger avant de soumettre.',
+                'errors'  => ['payload' => $invalid],
+            ], 422);
+        }
+
         return $this->transition($request, $documentRequest, RequestStatus::EnAttente, function ($dr) {
             DB::transaction(function () use ($dr) {
                 // Generate real reference at submission time
@@ -183,6 +192,74 @@ class RequestController extends Controller
         }
 
         return $missing;
+    }
+
+    /**
+     * Validate coherence of the payload beyond mere presence: real dates,
+     * chronological order, no past dates for missions/leaves, plausible year.
+     * Returns a map of field => human-readable error (empty means all good).
+     *
+     * @return array<string, string>
+     */
+    private function invalidPayloadFields(DocumentRequest $documentRequest): array
+    {
+        $code    = $documentRequest->documentType->code ?? null;
+        $payload = $documentRequest->payload ?? [];
+        $errors  = [];
+
+        $parse = function (string $field) use ($payload, &$errors): ?\Carbon\Carbon {
+            $raw = $payload[$field] ?? null;
+            if ($raw === null || trim((string) $raw) === '') {
+                return null;
+            }
+            try {
+                return \Carbon\Carbon::parse($raw)->startOfDay();
+            } catch (\Throwable) {
+                $errors[$field] = 'Date invalide.';
+                return null;
+            }
+        };
+
+        $today = \Carbon\Carbon::today();
+
+        // Document types whose start/end must not be in the past.
+        $noPast = in_array($code, ['ODM', 'AQT', 'PV-REPRISE', 'CONGE-ADM'], true);
+
+        $debut   = in_array('date_debut', array_keys($payload), true) ? $parse('date_debut') : null;
+        $fin     = in_array('date_fin', array_keys($payload), true) ? $parse('date_fin') : null;
+        $reprise = in_array('date_reprise', array_keys($payload), true) ? $parse('date_reprise') : null;
+
+        if ($noPast && $debut && ! isset($errors['date_debut']) && $debut->lt($today)) {
+            $errors['date_debut'] = 'La date de début ne peut pas être dans le passé.';
+        }
+
+        if ($debut && $fin && ! isset($errors['date_debut']) && ! isset($errors['date_fin']) && $fin->lt($debut)) {
+            $errors['date_fin'] = 'La date de fin doit être postérieure ou égale à la date de début.';
+        }
+
+        if ($reprise && $fin && ! isset($errors['date_fin']) && ! isset($errors['date_reprise']) && $reprise->lte($fin)) {
+            $errors['date_reprise'] = 'La date de reprise doit être postérieure à la date de fin.';
+        }
+
+        if ($code === 'ATT-HAB') {
+            $hab = $parse('date_habilitation');
+            if ($hab && ! isset($errors['date_habilitation']) && $hab->gt($today)) {
+                $errors['date_habilitation'] = "La date d'habilitation ne peut pas être dans le futur.";
+            }
+        }
+
+        if ($code === 'CARTE-NOT') {
+            $raw = $payload['annee_evaluation'] ?? null;
+            if ($raw !== null && trim((string) $raw) !== '') {
+                $year = (int) $raw;
+                $max  = (int) date('Y') + 1;
+                if ($year < 2000 || $year > $max) {
+                    $errors['annee_evaluation'] = "L'année doit être comprise entre 2000 et {$max}.";
+                }
+            }
+        }
+
+        return $errors;
     }
 
     public function cancel(Request $request, DocumentRequest $documentRequest): JsonResponse
