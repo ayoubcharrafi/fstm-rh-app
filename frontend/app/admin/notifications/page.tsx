@@ -60,7 +60,7 @@ export default function AdminNotificationsPage() {
 
   return (
     <AppShell>
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
           <p className="text-sm text-gray-500">
@@ -142,7 +142,8 @@ function BroadcastTab() {
       else toast.info(data.message);
       setTitle(''); setMessage('');
       qc.invalidateQueries({ queryKey: ['admin-notif-stats'] });
-      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['notifications-admin-inbox'] });
+      qc.invalidateQueries({ queryKey: ['notifications-bell'] });
       qc.invalidateQueries({ queryKey: ['notifications-count'] });
     },
     onError: e => toast.error(getApiError(e)),
@@ -282,14 +283,15 @@ function InboxTab() {
   const [filter, setFilter] = useState<InboxFilter>('all');
 
   const { data, isLoading } = useQuery<Paginated<AppNotification>>({
-    queryKey: ['notifications'],
+    queryKey: ['notifications-admin-inbox'],
     queryFn: () => api.get('/notifications').then(r => r.data),
   });
 
   const markAll = useMutation({
     mutationFn: () => api.post('/notifications/read-all'),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['notifications-admin-inbox'] });
+      qc.invalidateQueries({ queryKey: ['notifications-bell'] });
       qc.invalidateQueries({ queryKey: ['notifications-count'] });
     },
     onError: e => toast.error(getApiError(e)),
@@ -298,7 +300,8 @@ function InboxTab() {
   const markOne = useMutation({
     mutationFn: (id: number) => api.post(`/notifications/${id}/read`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['notifications-admin-inbox'] });
+      qc.invalidateQueries({ queryKey: ['notifications-bell'] });
       qc.invalidateQueries({ queryKey: ['notifications-count'] });
     },
     onError: e => toast.error(getApiError(e)),
@@ -403,7 +406,8 @@ function StatsTab() {
     onSuccess: (res) => {
       toast.success(res.data?.message ?? 'Notifications purgées.');
       qc.invalidateQueries({ queryKey: ['admin-notif-stats'] });
-      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['notifications-admin-inbox'] });
+      qc.invalidateQueries({ queryKey: ['notifications-bell'] });
       qc.invalidateQueries({ queryKey: ['notifications-count'] });
     },
     onError: e => toast.error(getApiError(e)),

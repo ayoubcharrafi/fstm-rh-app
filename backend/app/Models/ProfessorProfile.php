@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ProfessorProfile extends Model
 {
     protected $fillable = [
-        'staff_profile_id', 'laboratoire_id',
+        'staff_profile_id',
         'date_prise_fonction', 'date_habilitation', 'specialite',
     ];
 
@@ -23,10 +23,5 @@ class ProfessorProfile extends Model
     public function staffProfile(): BelongsTo
     {
         return $this->belongsTo(StaffProfile::class);
-    }
-
-    public function laboratoire(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationalUnit::class, 'laboratoire_id');
     }
 }

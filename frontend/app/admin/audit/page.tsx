@@ -166,7 +166,7 @@ export default function AdminAuditPage() {
 
   return (
     <AppShell>
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         {/* Header */}
         <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
           <div>

@@ -2,16 +2,30 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\DocumentAudience;
 use App\Http\Controllers\Controller;
 use App\Models\DocumentType;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class DocumentTypeController extends Controller
 {
     public function index(): JsonResponse
     {
-        return response()->json(DocumentType::orderBy('allowed_role')->orderBy('nom_fr')->get());
+        $user = Auth::user();
+
+        // L'admin gère le référentiel complet ; un demandeur ne voit que les types
+        // actifs qu'il peut réellement demander (cf. règle d'accès par rôle).
+        $types = DocumentType::query()
+            ->unless($user->isAdmin(), fn ($q) => $q
+                ->where('is_active', true)
+                ->whereIn('allowed_role', [DocumentAudience::Tous->value, $user->role->value]))
+            ->orderBy('allowed_role')
+            ->orderBy('nom_fr')
+            ->get();
+
+        return response()->json($types);
     }
 
     public function store(Request $request): JsonResponse

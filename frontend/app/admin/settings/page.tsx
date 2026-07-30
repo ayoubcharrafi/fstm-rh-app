@@ -10,6 +10,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import type { AccountDeletionRequest, DeletionStatus } from '@/lib/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface SettingsMap {
@@ -19,7 +20,33 @@ interface SettingsMap {
   'security.password_min_length': number;
   'security.jwt_ttl_minutes': number;
   'logs.audit_retention_days': number;
+  'notifications.email_enabled': boolean;
+  'notifications.email.request_submitted': boolean;
+  'notifications.email.request_processing': boolean;
+  'notifications.email.request_validated': boolean;
+  'notifications.email.request_rejected': boolean;
+  'notifications.email.document_available': boolean;
+  'notifications.email.admin_announcement': boolean;
+  'notifications.email.account_deletion_requested': boolean;
+  'notifications.email.account_deletion_rejected': boolean;
 }
+
+/**
+ * Les événements pouvant déclencher un e-mail, dans l'ordre de la cloche.
+ *
+ * `pour` distingue le destinataire : la plupart visent l'agent concerné, mais
+ * une demande de suppression part vers les administrateurs qui la traiteront.
+ */
+const EVENEMENTS: { key: keyof SettingsMap; label: string; help: string; pour?: 'admins' }[] = [
+  { key: 'notifications.email.request_submitted',           label: 'Demande soumise',             help: "Accusé de réception, juste après le dépôt de la demande." },
+  { key: 'notifications.email.request_processing',          label: 'En cours',                    help: "La demande vient d'être prise en charge par l'administration." },
+  { key: 'notifications.email.request_validated',           label: 'Validée',                     help: "L'agent est prévenu que sa demande a été acceptée." },
+  { key: 'notifications.email.request_rejected',            label: 'Rejetée',                     help: 'Le motif du rejet est rappelé dans le message.' },
+  { key: 'notifications.email.document_available',          label: 'Document prêt',               help: 'Un document est disponible au téléchargement.' },
+  { key: 'notifications.email.admin_announcement',          label: 'Annonce',                     help: 'Message diffusé à plusieurs agents à la fois.' },
+  { key: 'notifications.email.account_deletion_requested',  label: 'Suppression de compte',       help: 'Un agent demande la suppression de son compte.', pour: 'admins' },
+  { key: 'notifications.email.account_deletion_rejected',   label: 'Suppression refusée',         help: "La demande de suppression de l'agent a été refusée." },
+];
 
 interface SystemInfo {
   php_version: string;
@@ -36,12 +63,13 @@ interface SettingsResponse {
   system: SystemInfo;
 }
 
-type TabKey = 'compte' | 'securite' | 'demandes' | 'logs';
+type TabKey = 'compte' | 'securite' | 'demandes' | 'notifications' | 'logs';
 
 const TABS: { key: TabKey; label: string; iconPath: string }[] = [
   { key: 'compte',   label: 'Mon compte',          iconPath: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
   { key: 'securite', label: 'Sécurité plateforme', iconPath: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' },
   { key: 'demandes', label: 'Demandes',            iconPath: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
+  { key: 'notifications', label: 'Notifications',  iconPath: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' },
   { key: 'logs',     label: 'Logs & maintenance',  iconPath: 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4' },
 ];
 
@@ -113,7 +141,7 @@ export default function AdminSettingsPage() {
 
   return (
     <AppShell>
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="mx-auto max-w-4xl">
         {/* Header */}
         <div className="mb-6">
@@ -151,6 +179,7 @@ export default function AdminSettingsPage() {
             {tab === 'compte'   && <AccountTab lastLogin={user?.last_login_at ?? null} email={user?.email ?? ''} role={user?.role ?? ''} sessionMinutes={data?.settings['security.jwt_ttl_minutes'] ?? 60} />}
             {tab === 'securite' && <SecurityTab settings={data!.settings} />}
             {tab === 'demandes' && <RequestsTab settings={data!.settings} />}
+            {tab === 'notifications' && <NotificationsTab settings={data!.settings} />}
             {tab === 'logs'     && <LogsTab settings={data!.settings} system={data!.system} onPurged={() => qc.invalidateQueries({ queryKey: ['admin-settings'] })} />}
           </div>
         )}
@@ -260,7 +289,7 @@ function useSettingsForm(initial: SettingsMap) {
   useEffect(() => { setForm(initial); }, [initial]);
 
   const mutation = useMutation({
-    mutationFn: (payload: Partial<Record<string, number>>) => api.put('/admin/settings', payload),
+    mutationFn: (payload: Record<string, number | boolean>) => api.put('/admin/settings', payload),
     onSuccess: () => {
       toast.success('Paramètres enregistrés.');
       qc.invalidateQueries({ queryKey: ['admin-settings'] });
@@ -268,14 +297,18 @@ function useSettingsForm(initial: SettingsMap) {
     onError: e => toast.error(getApiError(e)),
   });
 
-  const set = (key: keyof SettingsMap, value: number) =>
+  const set = <K extends keyof SettingsMap>(key: K, value: SettingsMap[K]) =>
     setForm(f => ({ ...f, [key]: value }));
 
   return { form, set, mutation };
 }
 
 // snake payload keys expected by the API (dots → underscores)
-function payloadKey(key: keyof SettingsMap): string {
+type NumericSettingKey = {
+  [K in keyof SettingsMap]: SettingsMap[K] extends number ? K : never;
+}[keyof SettingsMap];
+
+function payloadKey(key: NumericSettingKey): string {
   return key.replace(/\./g, '_');
 }
 
@@ -284,7 +317,7 @@ function SecurityTab({ settings }: { settings: SettingsMap }) {
   const { form, set, mutation } = useSettingsForm(settings);
 
   const save = () => {
-    const keys: (keyof SettingsMap)[] = [
+    const keys: NumericSettingKey[] = [
       'security.login_max_attempts',
       'security.login_decay_seconds',
       'security.password_min_length',
@@ -351,22 +384,122 @@ function RequestsTab({ settings }: { settings: SettingsMap }) {
     });
 
   return (
-    <SectionCard
-      title="Traitement des demandes"
-      description="Paramètres liés au suivi des demandes de documents."
-    >
-      <NumberField
-        label="Seuil d'alerte « en retard »"
-        help="Une demande en attente ou en cours est signalée comme en retard sur le tableau de bord après ce délai."
-        unit="heures"
-        min={1} max={720}
-        value={form['requests.stale_threshold_hours']}
-        onChange={v => set('requests.stale_threshold_hours', v)}
-      />
-      <div className="mt-6 flex justify-end border-t border-gray-100 pt-4">
-        <Button onClick={save} loading={mutation.isPending}>Enregistrer</Button>
-      </div>
-    </SectionCard>
+    <div className="space-y-4">
+      <SectionCard
+        title="Traitement des demandes"
+        description="Paramètres liés au suivi des demandes de documents."
+      >
+        <NumberField
+          label="Seuil d'alerte « en retard »"
+          help="Une demande en attente ou en cours est signalée comme en retard sur le tableau de bord après ce délai."
+          unit="heures"
+          min={1} max={720}
+          value={form['requests.stale_threshold_hours']}
+          onChange={v => set('requests.stale_threshold_hours', v)}
+        />
+        <div className="mt-6 flex justify-end border-t border-gray-100 pt-4">
+          <Button onClick={save} loading={mutation.isPending}>Enregistrer</Button>
+        </div>
+      </SectionCard>
+
+      {/* Regroupé ici : les suppressions de compte sont, elles aussi, des
+          demandes déposées par les agents et traitées par l'administration. */}
+      <DeletionsTab />
+    </div>
+  );
+}
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+function NotificationsTab({ settings }: { settings: SettingsMap }) {
+  const { form, set, mutation } = useSettingsForm(settings);
+  const actif = form['notifications.email_enabled'];
+
+  // Une case à cocher n'a pas besoin d'un bouton « Enregistrer » : la bascule
+  // est l'action, et l'admin doit voir l'effet immédiatement.
+  const basculer = (cle: keyof SettingsMap, valeur: boolean) => {
+    set(cle, valeur as SettingsMap[typeof cle]);
+    mutation.mutate({ [cle.replace(/\./g, '_')]: valeur });
+  };
+
+  // Couper l'interrupteur général prive tous les agents d'e-mail d'un seul
+  // clic, sans qu'aucun d'eux en soit informé : on demande confirmation.
+  // Le réactiver est sans risque et reste immédiat.
+  const basculerGeneral = (valeur: boolean) => {
+    if (!valeur && !window.confirm(
+      "Désactiver l'envoi d'e-mails ?\n\n"
+      + "Plus aucun e-mail ne sera envoyé, quels que soient les événements cochés "
+      + "et les préférences des agents. Les notifications resteront visibles dans "
+      + 'la cloche de la plateforme.'
+    )) {
+      return;
+    }
+    basculer('notifications.email_enabled', valeur);
+  };
+
+  return (
+    <div className="space-y-4">
+      <SectionCard
+        title="Notifications par e-mail"
+        description="Interrupteur général pour toute la plateforme."
+      >
+        <label className="flex cursor-pointer items-start gap-3">
+          <input
+            type="checkbox"
+            checked={actif}
+            disabled={mutation.isPending}
+            onChange={e => basculerGeneral(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-wait"
+          />
+          <span className="text-sm">
+            <span className="font-medium text-gray-900">Autoriser l&apos;envoi d&apos;e-mails aux agents</span>
+            <span className="mt-0.5 block text-gray-500">
+              Chaque agent reste libre de refuser ces e-mails depuis ses propres paramètres.
+            </span>
+          </span>
+        </label>
+
+        {!actif && (
+          <p className="mt-4 rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Aucun e-mail n&apos;est envoyé actuellement, quelle que soit la préférence des agents.
+            Les notifications restent consultables dans la cloche de la plateforme.
+          </p>
+        )}
+      </SectionCard>
+
+      <SectionCard
+        title="Événements concernés"
+        description="Choisissez les événements qui déclenchent un e-mail."
+      >
+        <div className={`space-y-3 ${actif ? '' : 'opacity-50'}`}>
+          {EVENEMENTS.map(ev => (
+            <label key={ev.key} className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={Boolean(form[ev.key])}
+                disabled={!actif || mutation.isPending}
+                onChange={e => basculer(ev.key, e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
+              />
+              <span className="text-sm">
+                <span className="font-medium text-gray-900">{ev.label}</span>
+                {ev.pour === 'admins' && (
+                  <span className="ml-2 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+                    aux administrateurs
+                  </span>
+                )}
+                <span className="mt-0.5 block text-gray-500">{ev.help}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+
+        <p className="mt-5 border-t border-gray-100 pt-4 text-xs text-gray-500">
+          Décocher un événement ne supprime rien : la notification reste créée et visible dans la
+          cloche du destinataire, seul l&apos;e-mail n&apos;est plus envoyé. Chaque agent peut par
+          ailleurs refuser ces e-mails depuis ses propres paramètres.
+        </p>
+      </SectionCard>
+    </div>
   );
 }
 
@@ -451,5 +584,121 @@ function SysStat({ label, value }: { label: string; value: string | number }) {
       <p className="truncate text-lg font-bold text-gray-900">{value}</p>
       <p className="text-xs text-gray-500">{label}</p>
     </div>
+  );
+}
+
+// ─── Suppressions de compte ──────────────────────────────────────────────────
+const DELETION_STATUS: Record<DeletionStatus, { label: string; cls: string }> = {
+  EN_ATTENTE: { label: 'En attente', cls: 'bg-amber-100 text-amber-800' },
+  APPROUVEE:  { label: 'Approuvée',  cls: 'bg-red-100 text-red-700' },
+  REFUSEE:    { label: 'Refusée',    cls: 'bg-gray-100 text-gray-600' },
+};
+
+function DeletionsTab() {
+  const qc = useQueryClient();
+  const [status, setStatus] = useState<DeletionStatus | ''>('EN_ATTENTE');
+  const [replies, setReplies] = useState<Record<number, string>>({});
+
+  const { data, isLoading } = useQuery<{ data: AccountDeletionRequest[] }>({
+    queryKey: ['admin-account-deletions', status],
+    queryFn: () => api.get('/admin/account-deletions', { params: status ? { status } : {} }).then(r => r.data),
+  });
+
+  const decide = useMutation({
+    mutationFn: ({ id, action, reponse }: { id: number; action: 'approve' | 'reject'; reponse: string }) =>
+      api.post(`/admin/account-deletions/${id}/${action}`, { reponse_admin: reponse || null }),
+    onSuccess: (_, vars) => {
+      toast.success(vars.action === 'approve' ? 'Compte supprimé.' : 'Demande refusée.');
+      qc.invalidateQueries({ queryKey: ['admin-account-deletions'] });
+    },
+    onError: e => toast.error(getApiError(e)),
+  });
+
+  const rows = data?.data ?? [];
+
+  return (
+    <SectionCard
+      title="Demandes de suppression de compte"
+      description="Les agents ne peuvent pas supprimer leur compte eux-mêmes : chaque demande passe par vous."
+    >
+      <div className="mb-4 flex flex-wrap gap-1">
+        {([['EN_ATTENTE', 'En attente'], ['APPROUVEE', 'Approuvées'], ['REFUSEE', 'Refusées'], ['', 'Toutes']] as const).map(([key, label]) => (
+          <button
+            key={label}
+            onClick={() => setStatus(key as DeletionStatus | '')}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors
+              ${status === key ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="h-24 animate-pulse rounded-lg bg-gray-50" />
+      ) : rows.length === 0 ? (
+        <p className="py-8 text-center text-sm text-gray-500">Aucune demande.</p>
+      ) : (
+        <div className="space-y-3">
+          {rows.map(d => {
+            const p = d.user?.staff_profile;
+            const nom = p?.prenom_fr ? `${p.prenom_fr} ${p.nom_fr}` : d.user?.email ?? `#${d.user_id}`;
+            const pending = d.status === 'EN_ATTENTE';
+            const meta = DELETION_STATUS[d.status];
+
+            return (
+              <div key={d.id} className="rounded-lg border border-gray-200 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="font-medium text-gray-900">{nom}</p>
+                    <p className="text-xs text-gray-500">{d.user?.email} · déposée le {formatDateTime(d.created_at)}</p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.cls}`}>{meta.label}</span>
+                </div>
+
+                <p className="mt-3 whitespace-pre-line rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">{d.motif}</p>
+
+                {d.reponse_admin && (
+                  <p className="mt-2 text-sm text-gray-600">
+                    <span className="font-medium">Réponse :</span> {d.reponse_admin}
+                  </p>
+                )}
+
+                {pending && (
+                  <div className="mt-4 space-y-3">
+                    <textarea
+                      rows={2}
+                      placeholder="Réponse à l'agent (obligatoire en cas de refus)"
+                      value={replies[d.id] ?? ''}
+                      onChange={e => setReplies(r => ({ ...r, [d.id]: e.target.value }))}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        loading={decide.isPending}
+                        onClick={() => decide.mutate({ id: d.id, action: 'approve', reponse: replies[d.id] ?? '' })}
+                      >
+                        Approuver et supprimer
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        loading={decide.isPending}
+                        disabled={!(replies[d.id] ?? '').trim()}
+                        onClick={() => decide.mutate({ id: d.id, action: 'reject', reponse: replies[d.id] ?? '' })}
+                      >
+                        Refuser
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </SectionCard>
   );
 }

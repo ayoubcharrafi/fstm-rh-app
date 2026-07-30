@@ -3,14 +3,17 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\PasswordResetCodeMail;
 use App\Models\AuditLog;
+use App\Models\PasswordResetCode;
 use App\Models\Setting;
+use App\Models\User;
 use App\Services\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
@@ -72,33 +75,108 @@ class AuthController extends Controller
         return response()->json(['message' => 'Logged out.']);
     }
 
+    /**
+     * Étape 1 : envoi d'un code à 6 chiffres à l'adresse indiquée.
+     *
+     * La réponse est identique que le compte existe ou non : sinon, ce point
+     * d'entrée permettrait d'énumérer les adresses enregistrées.
+     */
     public function forgotPassword(Request $request): JsonResponse
     {
         $request->validate(['email' => ['required', 'email']]);
-        Password::sendResetLink($request->only('email'));
-        return response()->json(['message' => 'If the email exists, a reset link has been sent.']);
+
+        $email = strtolower(trim($request->input('email')));
+
+        // Limite par adresse ET par IP : empêche d'inonder la boîte d'un agent
+        // comme de balayer des adresses depuis un même poste.
+        foreach (["pwd-code:{$email}", 'pwd-code-ip:' . $request->ip()] as $cle) {
+            if (RateLimiter::tooManyAttempts($cle, 5)) {
+                throw ValidationException::withMessages([
+                    'email' => ['Trop de demandes. Réessayez dans quelques minutes.'],
+                ]);
+            }
+            RateLimiter::hit($cle, 900);
+        }
+
+        $user = User::where('email', $email)->first();
+
+        if ($user) {
+            // Les codes encore valides sont neutralisés : un seul code actif
+            // à la fois, sinon les anciens resteraient exploitables.
+            PasswordResetCode::where('email', $email)
+                ->whereNull('used_at')
+                ->update(['used_at' => now()]);
+
+            $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+            PasswordResetCode::create([
+                'email'      => $email,
+                'code_hash'  => Hash::make($code),
+                'expires_at' => now()->addMinutes(PasswordResetCode::DUREE_MINUTES),
+                'ip'         => $request->ip(),
+            ]);
+
+            Mail::to($email)->send(
+                new PasswordResetCodeMail($code, $user->staffProfile?->prenom_fr)
+            );
+
+            $this->audit->log('auth.reset_code_sent', $user, [], [], $request);
+        }
+
+        return response()->json([
+            'message' => 'Si cette adresse correspond à un compte, un code vient d\'être envoyé.',
+            'expire_dans_minutes' => PasswordResetCode::DUREE_MINUTES,
+        ]);
     }
 
+    /**
+     * Étape 2 : vérification du code et enregistrement du nouveau mot de passe.
+     */
     public function resetPassword(Request $request): JsonResponse
     {
         $request->validate([
-            'token'    => ['required'],
             'email'    => ['required', 'email'],
+            'code'     => ['required', 'string', 'digits:6'],
             'password' => ['required', 'string', 'min:' . Setting::passwordMin(), 'confirmed'],
         ]);
 
-        $status = Password::reset(
-            $request->only('email', 'password', 'password_confirmation', 'token'),
-            function ($user, $password) {
-                $user->forceFill(['password' => Hash::make($password)])->save();
-            }
-        );
+        $email = strtolower(trim($request->input('email')));
 
-        if ($status !== Password::PASSWORD_RESET) {
-            throw ValidationException::withMessages(['email' => [__($status)]]);
+        $erreur = ValidationException::withMessages([
+            'code' => ['Code invalide ou expiré. Demandez-en un nouveau.'],
+        ]);
+
+        $reset = PasswordResetCode::where('email', $email)
+            ->whereNull('used_at')
+            ->latest()
+            ->first();
+
+        if (! $reset || ! $reset->estUtilisable()) {
+            throw $erreur;
         }
 
-        return response()->json(['message' => 'Password reset successfully.']);
+        if (! Hash::check($request->input('code'), $reset->code_hash)) {
+            // Chaque essai manqué est compté : au cinquième, le code est mort
+            // et l'agent doit en redemander un.
+            $reset->increment('attempts');
+            throw $erreur;
+        }
+
+        $user = User::where('email', $email)->first();
+
+        if (! $user) {
+            throw $erreur;
+        }
+
+        $reset->update(['used_at' => now()]);
+
+        $user->forceFill(['password' => Hash::make($request->input('password'))])->save();
+
+        $this->audit->log('auth.password_reset', $user, [], [], $request);
+
+        return response()->json([
+            'message' => 'Mot de passe réinitialisé. Vous pouvez vous connecter.',
+        ]);
     }
 
     private function tokenResponse(string $token): JsonResponse
@@ -107,7 +185,8 @@ class AuthController extends Controller
             'access_token' => $token,
             'token_type'   => 'bearer',
             'expires_in'   => Auth::factory()->getTTL() * 60,
-            'user'         => Auth::user(),
+            // Sans le profil, l'interface retombe sur l'email en guise de nom.
+            'user'         => Auth::user()->load('staffProfile.grade', 'staffProfile.organizationalUnit'),
         ]);
     }
 }

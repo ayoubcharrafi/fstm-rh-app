@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { typeMeta, relativeTime, fullDate } from '@/lib/notifications';
-import type { Paginated, Notification as AppNotification } from '@/lib/types';
+import { typeMeta, relativeTime, fullDate, notificationHref } from '@/lib/notifications';
+import type { PaginatedNotifications } from '@/lib/types';
 
 /**
  * Cloche de notifications avec panneau déroulant.
@@ -18,19 +18,23 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const { data } = useQuery<Paginated<AppNotification>>({
-    queryKey: ['notifications'],
+  const { data } = useQuery<PaginatedNotifications>({
+    // Clé propre : la page /notifications utilise ['notifications', filtre…] et
+    // renverrait ici une liste filtrée si on partageait la même clé.
+    queryKey: ['notifications-bell'],
     queryFn: () => api.get('/notifications').then(r => r.data),
     refetchInterval: 30_000,
   });
 
   const items = data?.data ?? [];
-  const unread = items.filter(n => !n.read_at).length;
+  // Total serveur : filtrer items ne compterait que la première page.
+  const unread = data?.unread_count ?? 0;
 
   const markOne = useMutation({
     mutationFn: (id: number) => api.post(`/notifications/${id}/read`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['notifications-bell'] });
       qc.invalidateQueries({ queryKey: ['notifications-count'] });
     },
   });
@@ -39,6 +43,7 @@ export function NotificationBell() {
     mutationFn: () => api.post('/notifications/read-all'),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['notifications-bell'] });
       qc.invalidateQueries({ queryKey: ['notifications-count'] });
     },
   });
@@ -122,7 +127,18 @@ export function NotificationBell() {
                     <div className="min-w-0 flex-1">
                       <p className={`truncate text-sm ${n.read_at ? 'font-medium text-gray-700' : 'font-semibold text-gray-900'}`}>{n.title}</p>
                       <p className="truncate text-xs text-gray-500">{n.message}</p>
-                      <p className="mt-0.5 text-xs text-gray-400" title={fullDate(n.created_at)}>{relativeTime(n.created_at)}</p>
+                      <div className="mt-0.5 flex items-center gap-2">
+                        <p className="text-xs text-gray-400" title={fullDate(n.created_at)}>{relativeTime(n.created_at)}</p>
+                        {notificationHref(n.data) && (
+                          <Link
+                            href={notificationHref(n.data)!}
+                            onClick={() => setOpen(false)}
+                            className="text-xs font-medium text-blue-600 hover:underline"
+                          >
+                            Voir
+                          </Link>
+                        )}
+                      </div>
                     </div>
                     {!n.read_at && <span className="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-blue-500" title="Non lu" />}
                   </li>

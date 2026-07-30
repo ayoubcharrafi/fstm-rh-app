@@ -47,7 +47,6 @@ const schema = z.object({
   specialite:               z.string().optional(),
   date_prise_fonction:      z.string().optional(),
   date_habilitation:        z.string().optional(),
-  laboratoire_id:           z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -74,7 +73,6 @@ export default function NewUserPage() {
   const flatUnits: OrganizationalUnit[] = [];
   units?.forEach(u => { flatUnits.push(u); u.children?.forEach(c => flatUnits.push(c)); });
   const departments = flatUnits.filter(u => u.type === 'DEPARTEMENT');
-  const labos       = flatUnits.filter(u => u.type === 'LABORATOIRE');
   const filteredGrades = grades?.filter(g => !g.staff_type || g.staff_type === role) ?? [];
 
   const createMutation = useMutation({
@@ -117,7 +115,6 @@ export default function NewUserPage() {
           specialite:          data.specialite || undefined,
           date_prise_fonction: data.date_prise_fonction || undefined,
           date_habilitation:   data.date_habilitation || undefined,
-          laboratoire_id:      data.laboratoire_id || undefined,
         }),
       });
 
@@ -145,7 +142,7 @@ export default function NewUserPage() {
 
   return (
     <AppShell>
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="mb-6 flex items-center gap-4">
           <button onClick={() => router.back()} className="text-sm text-gray-400 hover:text-gray-600">← Retour</button>
           <h1 className="text-2xl font-bold text-gray-900">Nouveau membre du personnel</h1>
@@ -159,7 +156,7 @@ export default function NewUserPage() {
               <p className="font-semibold text-gray-900">Compte d'accès</p>
             </div>
             <CardBody>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Input label="Email *" type="email" autoComplete="off" error={errors.email?.message} {...register('email')} />
                 <Input label="Mot de passe *" type="password" autoComplete="new-password" error={errors.password?.message} {...register('password')} />
                 <div className="col-span-2 flex flex-col gap-1">
@@ -190,7 +187,7 @@ export default function NewUserPage() {
               <p className="font-semibold text-gray-900">Identité</p>
             </div>
             <CardBody>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Input label="Nom (français) *" error={errors.nom_fr?.message} {...register('nom_fr')} />
                 <Input label="Prénom (français) *" error={errors.prenom_fr?.message} {...register('prenom_fr')} />
                 <Input label="Nom (arabe)" {...register('nom_ar')} />
@@ -211,7 +208,7 @@ export default function NewUserPage() {
               <p className="font-semibold text-gray-900">Situation administrative</p>
             </div>
             <CardBody>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {sel('situation_administrative', 'Situation administrative', [
                   { value: 'En activité', label: 'En activité' },
                   { value: 'Détaché', label: 'Détaché' },
@@ -232,11 +229,10 @@ export default function NewUserPage() {
                 <p className="font-semibold text-gray-900">Informations professeur</p>
               </div>
               <CardBody>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Input label="Spécialité" {...register('specialite')} />
                   <Input label="Date de prise de fonction" type="date" {...register('date_prise_fonction')} />
                   <Input label="Date d'habilitation" type="date" {...register('date_habilitation')} />
-                  {sel('laboratoire_id', 'Laboratoire (optionnel)', labos.map(u => ({ value: String(u.id), label: u.nom_fr })))}
                 </div>
               </CardBody>
             </Card>
@@ -249,7 +245,7 @@ export default function NewUserPage() {
                 <p className="font-semibold text-gray-900">Informations employé</p>
               </div>
               <CardBody>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Input label="Fonction actuelle" {...register('fonction_actuelle')} />
                   <Input label="Date d'affectation" type="date" {...register('date_affectation')} />
                   {sel('situation_familiale', 'Situation familiale', [

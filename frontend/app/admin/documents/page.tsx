@@ -95,7 +95,7 @@ export default function AdminDocumentsPage() {
 
   return (
     <AppShell>
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Types de documents</h1>
@@ -116,7 +116,7 @@ export default function AdminDocumentsPage() {
             </div>
             <CardBody>
               <form onSubmit={handleSubmit(d => saveMutation.mutate(d))} autoComplete="off">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Input
                     label="Code *"
                     placeholder="ex: ATT-TRAV-FR"

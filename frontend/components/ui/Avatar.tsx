@@ -33,3 +33,22 @@ export function Avatar({ photoUrl, initials, size = 'md', className = '' }: Avat
     </div>
   );
 }
+
+/** Teinte de repli quand l'agent n'a pas encore déposé de photo. */
+export const ROLE_AVATAR: Record<string, string> = {
+  ADMIN:      'bg-purple-100 text-purple-700',
+  PROFESSEUR: 'bg-blue-100 text-blue-700',
+  EMPLOYE:    'bg-orange-100 text-orange-700',
+};
+
+/** Initiales prénom + nom, avec repli sur l'email pour un compte sans profil. */
+export function initialsOf(user: {
+  email: string;
+  staff_profile?: { prenom_fr?: string | null; nom_fr?: string | null } | null;
+}): string {
+  const p = user.staff_profile;
+  if (p?.prenom_fr) {
+    return `${p.prenom_fr[0] ?? ''}${p.nom_fr?.[0] ?? ''}`.toUpperCase();
+  }
+  return (user.email[0] ?? '?').toUpperCase();
+}

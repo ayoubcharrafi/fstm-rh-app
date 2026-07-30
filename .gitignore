@@ -1,29 +1,53 @@
-# Environment
+# ─── Secrets et environnement ────────────────────────────────────────────────
+# Ne jamais versionner : contient identifiants BDD, APP_KEY, JWT_SECRET.
 .env
 .env.*
 !.env.example
 
-# Dependencies
+# ─── Dépendances ─────────────────────────────────────────────────────────────
 backend/vendor/
 frontend/node_modules/
 
-# Build output
+# ─── Build et sortie de compilation ──────────────────────────────────────────
 frontend/.next/
 frontend/out/
+frontend/next-env.d.ts
+frontend/tsconfig.tsbuildinfo
 backend/public/build/
-backend/storage/framework/views/*.php
+backend/public/hot
 
-# Runtime and cache
+# ─── Fichiers générés à l'exécution ──────────────────────────────────────────
+backend/storage/*.key
+backend/storage/pail/
+backend/storage/framework/views/*.php
 backend/storage/logs/*.log
 backend/.phpunit.result.cache
-.DS_Store
-Thumbs.db
-*:Zone.Identifier
+backend/public/storage
 
+# Documents téléversés et PDF générés : données métier, pas du code.
+backend/storage/app/private/requests/
+backend/storage/app/public/photos/
 
-# IDE
+# ─── Outils et éditeurs ──────────────────────────────────────────────────────
 .vscode/
 .idea/
 .claude/
-# Local project documentation
+.fleet/
+*.sublime-*
+
+# ─── Système ─────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+*:Zone.Identifier
+
+# ─── Fichiers temporaires et sauvegardes ─────────────────────────────────────
+*.bak
+*.tmp
+*.old
+*.orig
+*~
+.dist/
+
+# ─── Documentation interne (non destinée au dépôt public) ────────────────────
 CAHIER_DES_CHARGES_DETAILLE.md

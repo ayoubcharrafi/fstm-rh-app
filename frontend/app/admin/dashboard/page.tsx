@@ -10,6 +10,7 @@ import {
   BarChart, Bar,
 } from 'recharts';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/Badge';
@@ -185,10 +186,15 @@ function Skeleton() {
 
 // ---------- page ----------
 export default function AdminDashboardPage() {
+  const { user } = useAuth();
+
   const { data, isLoading, isFetching, refetch } = useQuery<AdminDashboard>({
     queryKey: ['dashboard-admin'],
     queryFn: () => api.get('/admin/dashboard').then(r => r.data),
   });
+
+  const profile = user?.staff_profile;
+  const fullName = profile?.prenom_fr ? `${profile.prenom_fr} ${profile.nom_fr}` : user?.email;
 
   const handleRefresh = async () => {
     await refetch();
@@ -220,12 +226,12 @@ export default function AdminDashboardPage() {
 
   return (
     <AppShell>
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         {/* Header */}
-        <div className="sticky top-0 z-20 -mx-8 -mt-8 mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-gray-200/70 bg-gray-50/80 px-8 py-4 backdrop-blur">
+        <div className="sticky top-12 z-20 -mx-4 -mt-4 mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-gray-200/70 bg-gray-50/80 px-4 py-4 backdrop-blur sm:-mx-6 sm:-mt-6 sm:px-6 lg:top-0 lg:-mx-8 lg:-mt-8 lg:px-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Tableau de bord</h1>
-            <p className="text-sm text-gray-500">Vue globale de l'activité RH</p>
+            <h1 className="text-2xl font-bold text-gray-900">Bonjour, {fullName}</h1>
+            <p className="text-sm text-gray-500">Vue globale de l&apos;activité RH</p>
           </div>
           <div className="flex items-center gap-2">
             <NotificationBell />
@@ -403,6 +409,7 @@ export default function AdminDashboardPage() {
                   {!data.pending_queue.length ? (
                     <p className="py-8 text-center text-sm text-gray-400">Aucune demande en attente. 🎉</p>
                   ) : (
+                    <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-gray-400">
                         <tr>
@@ -431,6 +438,7 @@ export default function AdminDashboardPage() {
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   )}
                 </CardBody>
               </Card>

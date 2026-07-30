@@ -15,7 +15,7 @@ class StaffProfile extends Model
     protected $fillable = [
         'user_id', 'staff_type', 'nom_fr', 'prenom_fr', 'nom_ar', 'prenom_ar',
         'sexe', 'date_naissance', 'lieu_naissance', 'cin', 'doti', 'telephone',
-        'situation_administrative', 'date_recrutement', 'grade_id',
+        'fonction', 'situation_administrative', 'date_recrutement', 'grade_id',
         'organizational_unit_id', 'photo_path',
     ];
 

@@ -38,8 +38,171 @@ body {
   animation: fadeInUp 0.4s ease-out both;
 }
 
+/* ─── Écran d'authentification ─────────────────────────────────────────────
+   Scène en perspective : les enfants transformés en 3D sont projetés depuis un
+   point de vue commun, ce qui donne au glissement sa profondeur réelle plutôt
+   qu'un simple déplacement à plat. */
+.auth-scene {
+  /* Débord du volet bleu sur la moitié droite, d'où la courbe tire son ampleur.
+     Déclaré sur la scène car les deux volets — frères — en ont besoin. */
+  --auth-bleed: 7rem;
+  /* Le S s'avance jusqu'à ~72% du volet bleu, donc le blanc libre est plus
+     étroit que la moitié d'écran. La carte est décalée de la moitié de cet
+     empiétement pour retomber au centre optique du blanc. */
+  --auth-decalage: calc(((50vw + var(--auth-bleed)) * 0.72 - 50vw) / 2);
+  perspective: 1800px;
+  perspective-origin: 50% 45%;
+}
+
+/* Les deux volets s'échangent : `order` inverse leur place dans la ligne flex,
+   et la transition anime la bascule. `cubic-bezier` avec un léger dépassement
+   donne la sensation d'une masse physique qui se pose. */
+.auth-panel {
+  transform-style: preserve-3d;
+  transition:
+    transform 900ms cubic-bezier(0.68, -0.35, 0.27, 1.35),
+    opacity 500ms ease-out;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* Le volet qui arrive par la gauche pivote autour de son bord droit, celui qui
+   arrive par la droite autour de son bord gauche : les deux semblent tourner
+   autour de la charnière centrale de l'écran, comme un livre qui s'ouvre. */
+.auth-slide-left {
+  transform-origin: right center;
+  animation: authSwapFromRight 900ms cubic-bezier(0.68, -0.28, 0.27, 1.28) both;
+}
+
+.auth-slide-right {
+  transform-origin: left center;
+  animation: authSwapFromLeft 900ms cubic-bezier(0.68, -0.28, 0.27, 1.28) both;
+}
+
+@keyframes authSwapFromRight {
+  from { transform: translate3d(58%, 0, -260px) rotateY(14deg); opacity: 0.35; }
+  60%  { transform: translate3d(-3%, 0, -40px) rotateY(-2deg);  opacity: 1; }
+  to   { transform: translate3d(0, 0, 0) rotateY(0deg);         opacity: 1; }
+}
+
+@keyframes authSwapFromLeft {
+  from { transform: translate3d(-58%, 0, -260px) rotateY(-14deg); opacity: 0.35; }
+  60%  { transform: translate3d(3%, 0, -40px) rotateY(2deg);      opacity: 1; }
+  to   { transform: translate3d(0, 0, 0) rotateY(0deg);           opacity: 1; }
+}
+
+/* Bleu marine institutionnel, en aplat. Le très léger dégradé vertical évite
+   l'effet d'aplat imprimé sans introduire de seconde teinte. Le filet clair est
+   posé en `box-shadow` plutôt qu'en bordure : une bordure décalerait la largeur
+   des volets et ferait sauter la bascule d'un pixel. */
+.auth-panel-decor {
+  background: linear-gradient(180deg, #0f2f6b 0%, #0a2050 100%);
+  background-color: #0a2050;
+  box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.08);
+}
+
+.auth-form {
+  animation: authFormIn 380ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both;
+}
+
+@keyframes authFormIn {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+/* Certains utilisateurs souffrent de vertiges face au mouvement ; le système
+   expose cette préférence, on la respecte en figeant les animations. */
+@media (prefers-reduced-motion: reduce) {
+  .auth-form,
+  .auth-slide-left,
+  .auth-slide-right,
+  .animate-fade-in-up {
+    animation: none;
+  }
+
+  .auth-panel {
+    transition: none;
+  }
+}
+
 /* Réserve en permanence la gouttière de la barre de défilement pour éviter
    que le contenu centré ne se décale quand la scrollbar apparaît/disparaît. */
 .scrollbar-stable {
   scrollbar-gutter: stable;
 }
+
+/* ─── Séparation courbe entre le volet bleu et le formulaire ───────────────
+   Le volet bleu est plus large que sa moitié d'écran et son bord intérieur est
+   découpé en S. Le débord (`--auth-bleed`) est exactement compensé par une
+   marge négative côté formulaire, sinon la somme des deux volets dépasserait
+   100% et provoquerait un défilement horizontal.
+
+   La découpe passe par un `<clipPath clipPathUnits="objectBoundingBox">` défini
+   dans le JSX : contrairement à `clip-path: path()`, dont les coordonnées sont
+   des pixels figés, les unités relatives suivent la taille du volet et la
+   courbe reste identique de 1024px à un écran 4K.
+
+   Largeur et découpe sont enfermées dans la media query : le décor n'existe qu'à
+   partir de `lg`, et `width: calc(50% + bleed)` ferait déborder la ligne flex en
+   mobile. */
+@media (min-width: 1024px) {
+  .auth-decor {
+    width: calc(50% + var(--auth-bleed));
+    clip-path: url(#authCurveLeft);
+  }
+
+  /* Volet miroir : quand le décor passe à droite, la courbe bombe vers la gauche.
+     `scaleX(-1)` retournerait aussi le texte, d'où un second tracé. */
+  .auth-decor-mirror {
+    clip-path: url(#authCurveRight);
+  }
+}
+
+/* La courbe est un `clip-path`, elle ne peut donc pas porter d'ombre : le halo
+   est un calque flou posé sous le décor. Il reste très diffus — un halo trop
+   dense redessinerait un bord net dans le blanc, exactement ce qu'on veut
+   éviter. */
+.auth-decor-glow {
+  position: absolute;
+  z-index: 0;
+  top: -10%;
+  height: 120%;
+  width: 22rem;
+  pointer-events: none;
+  filter: blur(4rem);
+  background: radial-gradient(ellipse at center, rgb(37 99 235 / 0.16), transparent 72%);
+}
+
+/* Le formulaire récupère l'espace pris par le débord du décor via une marge
+   négative, de sorte que les deux volets pavent exactement la largeur de
+   l'écran. Toute largeur supérieure ferait déborder la ligne flex et
+   comprimerait le décor.
+
+   Tout est enfermé dans la media query : sous `lg` le décor est masqué, donc il
+   n'y a aucun débord à compenser — une marge négative y décalerait le formulaire
+   hors de l'écran. */
+@media (min-width: 1024px) {
+  .auth-form-panel {
+    margin-inline-start: calc(-1 * var(--auth-bleed, 0rem));
+  }
+
+  .auth-form-panel-mirror {
+    margin-inline-start: 0;
+    margin-inline-end: calc(-1 * var(--auth-bleed, 0rem));
+  }
+
+  /* Le S s'avance dans la moitié blanche : la carte est donc décalée vers le bord
+     libre pour se retrouver au centre optique du blanc, sans toucher aux largeurs
+     des volets. */
+  .auth-form-panel .auth-form {
+    margin-inline-start: var(--auth-decalage);
+  }
+
+  .auth-form-panel-mirror .auth-form {
+    margin-inline-start: 0;
+    margin-inline-end: var(--auth-decalage);
+  }
+}
+
+/* Sous `lg`, le décor est masqué : le panneau occupe toute la largeur et son
+   propre `px-6` suffit — pas de débord à compenser, ni de padding à ajouter. */

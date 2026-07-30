@@ -50,7 +50,7 @@ export default function AdminGradesPage() {
 
   return (
     <AppShell>
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Grades</h1>
         </div>
@@ -94,6 +94,7 @@ export default function AdminGradesPage() {
                 {!grades?.length ? (
                   <p className="px-6 py-8 text-center text-sm text-gray-400">Aucun grade.</p>
                 ) : (
+                  <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-gray-400">
@@ -127,6 +128,7 @@ export default function AdminGradesPage() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </CardBody>
             </Card>

@@ -65,7 +65,7 @@ export default function RequestDetailPage() {
 
   return (
     <AppShell>
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="mb-6 flex items-center justify-between">
           <div>
             <p className="font-mono text-sm text-gray-500">{req.reference}</p>
@@ -107,7 +107,7 @@ export default function RequestDetailPage() {
                   <p className="font-semibold text-gray-900">Informations de la demande</p>
                 </div>
                 <CardBody>
-                  <dl className="grid grid-cols-2 gap-4">
+                  <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     {visiblePayloadEntries(req.payload).map(([k, v]) => (
                       <div key={k}>
                         <dt className="text-xs font-medium uppercase tracking-wide text-gray-400">{k.replace(/_/g, ' ')}</dt>

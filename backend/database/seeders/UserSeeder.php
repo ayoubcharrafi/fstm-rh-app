@@ -23,6 +23,18 @@ class UserSeeder extends Seeder
             ]
         );
 
+        // Le compte d'amorçage doit avoir le même profil que les
+        // administrateurs créés depuis l'interface, sans quoi il affiche
+        // « aucun profil renseigné » là où les autres montrent leur identité.
+        if ($admin && ! $admin->staffProfile) {
+            StaffProfile::create([
+                'user_id'    => $admin->id,
+                'staff_type' => 'ADMIN',
+                'nom_fr'     => 'Administrateur',
+                'prenom_fr'  => 'Système',
+            ]);
+        }
+
         // Demo professor
         $prof = User::firstOrCreate(
             ['email' => 'professeur@fst.ma'],

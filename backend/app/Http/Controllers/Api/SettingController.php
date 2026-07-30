@@ -30,6 +30,31 @@ class SettingController extends Controller
         'logs.audit_retention_days'      => ['min' => 0,  'max' => 3650],
     ];
 
+    /**
+     * Réglages booléens, validés séparément des bornes numériques.
+     *
+     * @var array<string, bool>  clé => valeur par défaut
+     */
+    private const BOOLEENS = [
+        'notifications.email_enabled'                    => true,
+
+        // Étapes intermédiaires : désactivées par défaut. L'agent vient d'agir ou
+        // l'information est mineure, et un e-mail à chaque étape ferait classer
+        // toute la série en indésirable. L'administration peut les activer.
+        'notifications.email.request_submitted'          => false,
+        'notifications.email.request_processing'         => false,
+
+        // Événements que l'agent attend ou sur lesquels il doit agir.
+        'notifications.email.request_validated'          => true,
+        'notifications.email.request_rejected'           => true,
+        'notifications.email.document_available'         => true,
+        'notifications.email.admin_announcement'         => true,
+
+        // Destinée aux administrateurs, qui traitent la demande.
+        'notifications.email.account_deletion_requested' => false,
+        'notifications.email.account_deletion_rejected'  => true,
+    ];
+
     public function index(): JsonResponse
     {
         return response()->json([
@@ -53,6 +78,9 @@ class SettingController extends Controller
             $field = str_replace('.', '_', $key);
             $rules[$field] = ['nullable', 'integer', "min:{$bounds['min']}", "max:{$bounds['max']}"];
         }
+        foreach (array_keys(self::BOOLEENS) as $key) {
+            $rules[str_replace('.', '_', $key)] = ['nullable', 'boolean'];
+        }
 
         $validated = $request->validate($rules);
 
@@ -64,6 +92,15 @@ class SettingController extends Controller
             if ($request->has($field) && $validated[$field] !== null) {
                 Setting::set($key, (int) $validated[$field], 'int');
                 $changed[$key] = (int) $validated[$field];
+            }
+        }
+
+        foreach (array_keys(self::BOOLEENS) as $key) {
+            $field = str_replace('.', '_', $key);
+            if ($request->has($field) && $validated[$field] !== null) {
+                $valeur = (bool) $validated[$field];
+                Setting::set($key, $valeur, 'bool');
+                $changed[$key] = $valeur;
             }
         }
 
@@ -93,7 +130,7 @@ class SettingController extends Controller
     /**
      * Lit les réglages courants (valeur en base, sinon défaut codé en dur).
      *
-     * @return array<string, int>
+     * @return array<string, int|bool>
      */
     private function currentSettings(): array
     {
@@ -109,6 +146,10 @@ class SettingController extends Controller
         $out = [];
         foreach ($defaults as $key => $default) {
             $out[$key] = (int) Setting::get($key, $default);
+        }
+
+        foreach (self::BOOLEENS as $key => $default) {
+            $out[$key] = (bool) Setting::get($key, $default);
         }
 
         return $out;

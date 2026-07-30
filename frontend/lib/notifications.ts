@@ -21,6 +21,8 @@ export const TYPE_META: Record<string, TypeMeta> = {
   'request.rejected':   { label: 'Rejetée',          path: 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z',                                                              tone: 'bg-red-50 text-red-600',      dot: 'bg-red-500' },
   'document.available': { label: 'Document prêt',    path: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4',                                                                     tone: 'bg-indigo-50 text-indigo-600', dot: 'bg-indigo-500' },
   'admin.announcement': { label: 'Annonce',          path: MEGAPHONE_PATH,                                                                                                                       tone: 'bg-purple-50 text-purple-600', dot: 'bg-purple-500' },
+  'account.deletion_requested': { label: 'Suppression de compte', path: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z', tone: 'bg-red-50 text-red-600', dot: 'bg-red-500' },
+  'account.deletion_rejected':  { label: 'Suppression refusée',   path: 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z',                                                                 tone: 'bg-gray-100 text-gray-600', dot: 'bg-gray-400' },
 };
 
 export function typeMeta(type: string): TypeMeta {
@@ -43,4 +45,13 @@ export function relativeTime(iso: string): string {
 
 export function fullDate(iso: string): string {
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+/**
+ * Lien vers la demande concernée, si la notification en référence une.
+ * Les annonces de l'administration n'en ont pas.
+ */
+export function notificationHref(data: Record<string, unknown> | null): string | null {
+  const id = data?.request_id;
+  return typeof id === 'number' || typeof id === 'string' ? `/requests/${id}` : null;
 }

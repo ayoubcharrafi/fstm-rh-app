@@ -186,7 +186,8 @@ class DocumentController extends Controller
             $documentRequest->requester,
             'document.available',
             'Document disponible',
-            "Votre document {$documentRequest->reference} est prêt à être téléchargé."
+            "Votre document {$documentRequest->reference} est prêt à être téléchargé.",
+            ['request_id' => $documentRequest->id, 'reference' => $documentRequest->reference],
         );
 
         $this->audit->log('document.signed_uploaded', $documentRequest, [], ['file_id' => $file->id], $request);

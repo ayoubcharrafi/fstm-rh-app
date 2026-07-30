@@ -30,7 +30,7 @@ export default function AdminRequestsPage() {
 
   return (
     <AppShell>
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Toutes les demandes</h1>
         </div>
@@ -55,7 +55,8 @@ export default function AdminRequestsPage() {
             ) : !data?.data.length ? (
               <p className="px-6 py-10 text-center text-sm text-gray-400">Aucune demande.</p>
             ) : (
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-gray-400">
                     <th className="px-6 py-3">Référence</th>
@@ -89,6 +90,7 @@ export default function AdminRequestsPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
             {data && data.last_page > 1 && (
               <div className="flex items-center justify-between border-t border-gray-100 px-6 py-3">

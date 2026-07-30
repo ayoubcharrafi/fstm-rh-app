@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { api, getApiError } from '@/lib/api';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -90,11 +90,12 @@ function getFieldErrors(typeCode: string, payload: Record<string, string>): Reco
   return errors;
 }
 
-export default function NewRequestPage() {
+function NewRequestForm() {
   const { user } = useAuth();
   const router   = useRouter();
+  const searchParams = useSearchParams();
 
-  const [selectedType, setSelectedType] = useState<DocumentType | null>(null);
+  const [typeOverride, setTypeOverride] = useState<DocumentType | null>(null);
   const [language, setLanguage]         = useState('fr');
   const [payload, setPayload]           = useState<Record<string, string>>({});
   const [showErrors, setShowErrors]     = useState(false);
@@ -109,6 +110,14 @@ export default function NewRequestPage() {
     if (t.allowed_role === 'TOUS') return true;
     return t.allowed_role === user?.role;
   });
+
+  // Type présélectionné via ?type=<id> (raccourcis du tableau de bord), jusqu'à
+  // ce que l'utilisateur en choisisse un autre.
+  const presetType = searchParams.get('type');
+  const selectedType = typeOverride
+    ?? allowedTypes?.find(t => String(t.id) === presetType)
+    ?? null;
+  const setSelectedType = setTypeOverride;
 
   const createMutation = useMutation({
     mutationFn: (draft: object) => api.post('/requests', draft).then(r => r.data),
@@ -172,7 +181,7 @@ export default function NewRequestPage() {
 
   return (
     <AppShell>
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Nouvelle demande</h1>
           <p className="text-sm text-gray-500">Sélectionnez le type de document puis complétez les informations</p>
@@ -238,7 +247,7 @@ export default function NewRequestPage() {
                       <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-blue-600">
                         Informations pré-remplies depuis votre profil
                       </p>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <ReadonlyField label="Nom (FR)" value={user?.staff_profile?.nom_fr} />
                         <ReadonlyField label="Prénom (FR)" value={user?.staff_profile?.prenom_fr} />
                         {user?.staff_profile?.nom_ar && <ReadonlyField label="الاسم" value={user.staff_profile.nom_ar} dir="rtl" />}
@@ -309,6 +318,16 @@ export default function NewRequestPage() {
   );
 }
 
+// useSearchParams() impose une frontière Suspense : sans elle, Next.js échoue au
+// prérendu de cette page (?type=<id> n'est connu que côté client).
+export default function NewRequestPage() {
+  return (
+    <Suspense fallback={<AppShell><p className="p-8 text-sm text-gray-400">Chargement…</p></AppShell>}>
+      <NewRequestForm />
+    </Suspense>
+  );
+}
+
 function ReadonlyField({ label, value, dir }: { label: string; value?: string; dir?: string }) {
   if (!value) return null;
   return (
@@ -357,7 +376,7 @@ function PayloadFields({
 
   if (typeCode === 'ATT-HAB') {
     return (
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {f('date_habilitation', "Date d'habilitation", 'date', true)}
       </div>
     );
@@ -365,7 +384,7 @@ function PayloadFields({
 
   if (typeCode === 'ODM') {
     return (
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {f('destination', 'Destination', 'text', true)}
         {f('objet', 'Objet de la mission', 'text', true)}
         {f('date_debut', 'Date de départ', 'date', true)}
@@ -377,7 +396,7 @@ function PayloadFields({
 
   if (typeCode === 'AQT') {
     return (
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {f('destination', 'Pays / Destination', 'text', true)}
         {f('date_debut', 'Date de début', 'date', true)}
         {f('date_fin', 'Date de fin', 'date', true)}
@@ -392,7 +411,7 @@ function PayloadFields({
     // par la hiérarchie. On ne demande donc que l'année d'évaluation.
     return (
       <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {f('annee_evaluation', "Année d'évaluation", 'number', true)}
         </div>
         <p className="text-xs text-gray-500">
@@ -404,7 +423,7 @@ function PayloadFields({
 
   if (typeCode === 'PV-REPRISE') {
     return (
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {f('type_conge', 'Type de congé', 'text', true)}
         {f('date_debut', 'Date début congé', 'date', true)}
         {f('date_fin', 'Date fin congé', 'date', true)}
@@ -415,7 +434,7 @@ function PayloadFields({
 
   if (typeCode === 'CONGE-ADM') {
     return (
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {f('date_debut', 'Date de début', 'date', true)}
         {f('date_fin', 'Date de fin', 'date', true)}
         {f('date_reprise', 'Date de reprise du travail', 'date', true)}

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AccountController;
+use App\Http\Controllers\Api\AccountDeletionController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\DocumentTypeController;
@@ -50,7 +51,13 @@ Route::prefix('v1')->group(function () {
         Route::patch('profile/contact', [UserController::class, 'updateContact']);
 
         // Mon compte
+        Route::get('account/overview', [AccountController::class, 'overview']);
         Route::post('account/password', [AccountController::class, 'changePassword']);
+        Route::patch('account/email', [AccountController::class, 'changeEmail']);
+        Route::patch('account/email-notifications', [AccountController::class, 'updateEmailNotifications']);
+        Route::get('account/export', [AccountController::class, 'exportData']);
+        Route::post('account/deletion-request', [AccountController::class, 'requestDeletion']);
+        Route::delete('account/deletion-request', [AccountController::class, 'cancelDeletion']);
 
         // Referentials (read-only for all authenticated)
         Route::get('grades', [GradeController::class, 'index']);
@@ -75,6 +82,7 @@ Route::prefix('v1')->group(function () {
         Route::get('notifications', [NotificationController::class, 'index']);
         Route::post('notifications/{notification}/read', [NotificationController::class, 'markRead']);
         Route::post('notifications/read-all', [NotificationController::class, 'markAllRead']);
+        Route::post('notifications/purge', [NotificationController::class, 'purge']);
 
         // Dashboard
         Route::get('dashboard/user', [DashboardController::class, 'user']);
@@ -89,6 +97,12 @@ Route::prefix('v1')->group(function () {
             Route::patch('users/{user}', [UserController::class, 'update']);
             Route::delete('users/{user}', [UserController::class, 'destroy']);
             Route::patch('users/{user}/status', [UserController::class, 'updateStatus']);
+            Route::post('users/{user}/reset-password', [UserController::class, 'resetPasswordByAdmin']);
+
+            // Demandes de suppression de compte
+            Route::get('account-deletions', [AccountDeletionController::class, 'index']);
+            Route::post('account-deletions/{deletion}/approve', [AccountDeletionController::class, 'approve']);
+            Route::post('account-deletions/{deletion}/reject', [AccountDeletionController::class, 'reject']);
 
             // Staff profiles
             Route::post('users/{user}/profile', [StaffProfileController::class, 'store']);

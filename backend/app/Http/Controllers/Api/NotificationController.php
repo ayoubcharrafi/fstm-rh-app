@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\UserNotification;
 use App\Services\AuditService;
 use App\Services\NotificationService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,13 +19,24 @@ class NotificationController extends Controller
         private AuditService $audit,
     ) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $notifications = UserNotification::where('user_id', Auth::id())
-            ->latest()
-            ->paginate(20);
+        $mine = fn () => UserNotification::where('user_id', Auth::id());
 
-        return response()->json($notifications);
+        $notifications = $mine()
+            ->when($request->status === 'unread', fn ($q) => $q->whereNull('read_at'))
+            ->when($request->status === 'read', fn ($q) => $q->whereNotNull('read_at'))
+            ->when($request->type, fn ($q) => $q->where('type', $request->type))
+            ->latest()
+            ->paginate(20)
+            ->withQueryString();
+
+        // Compteurs globaux : la pastille « non lues » doit refléter le total,
+        // pas seulement la page courante.
+        return response()->json(array_merge($notifications->toArray(), [
+            'unread_count' => $mine()->whereNull('read_at')->count(),
+            'total_count'  => $mine()->count(),
+        ]));
     }
 
     public function markRead(UserNotification $notification): JsonResponse
@@ -44,6 +56,43 @@ class NotificationController extends Controller
             ->update(['read_at' => now()]);
 
         return response()->json(['message' => 'All notifications marked as read.']);
+    }
+
+    public function purge(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'mode' => ['required', 'in:read,7_days,30_days,90_days,before_date'],
+            'before_date' => ['required_if:mode,before_date', 'date', 'before:today'],
+        ]);
+
+        $query = UserNotification::where('user_id', Auth::id());
+
+        switch ($data['mode']) {
+            case 'read':
+                $query->whereNotNull('read_at');
+                break;
+            case '7_days':
+                $query->where('created_at', '<', Carbon::now()->subDays(7));
+                break;
+            case '30_days':
+                $query->where('created_at', '<', Carbon::now()->subDays(30));
+                break;
+            case '90_days':
+                $query->where('created_at', '<', Carbon::now()->subDays(90));
+                break;
+            case 'before_date':
+                $query->where('created_at', '<', Carbon::parse($data['before_date'])->endOfDay());
+                break;
+        }
+
+        $deleted = $query->delete();
+
+        $this->audit->log('notifications.purged', Auth::user(), [], ['mode' => $data['mode'], 'before_date' => $data['before_date'] ?? null, 'count' => $deleted], $request);
+
+        return response()->json([
+            'message' => $deleted > 0 ? "{$deleted} notification(s) supprimée(s)." : 'Aucune notification à supprimer.',
+            'deleted' => $deleted,
+        ]);
     }
 
     // ---------- Admin ----------

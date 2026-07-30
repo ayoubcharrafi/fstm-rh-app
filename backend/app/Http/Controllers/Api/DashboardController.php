@@ -25,25 +25,91 @@ class DashboardController extends Controller
     public function user(): JsonResponse
     {
         $user = Auth::user();
+        $mine = fn () => DocumentRequest::where('requester_id', $user->id);
 
-        $statusCounts = DocumentRequest::where('requester_id', $user->id)
+        $statusCounts = $mine()
             ->selectRaw('status, count(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status');
 
-        $available = DocumentRequest::where('requester_id', $user->id)
-            ->where('status', RequestStatus::DocumentDisponible->value)
-            ->count();
+        $s = fn (RequestStatus $st) => (int) ($statusCounts[$st->value] ?? 0);
+        $available = $s(RequestStatus::DocumentDisponible);
 
         $unreadNotifications = UserNotification::where('user_id', $user->id)
             ->whereNull('read_at')
             ->count();
 
+        $recentNotifications = UserNotification::where('user_id', $user->id)
+            ->latest()
+            ->limit(5)
+            ->get(['id', 'type', 'title', 'message', 'read_at', 'created_at']);
+
+        // 6 derniers mois glissants : créées / abouties (document disponible)
+        $start = Carbon::now()->startOfMonth()->subMonths(5);
+        $createdByMonth = $mine()
+            ->selectRaw('DATE_FORMAT(created_at, "%Y-%m") as month, count(*) as total')
+            ->where('created_at', '>=', $start)
+            ->groupBy('month')
+            ->pluck('total', 'month');
+        $completedByMonth = $mine()
+            ->selectRaw('DATE_FORMAT(completed_at, "%Y-%m") as month, count(*) as total')
+            ->whereNotNull('completed_at')
+            ->where('completed_at', '>=', $start)
+            ->groupBy('month')
+            ->pluck('total', 'month');
+
+        $monthly = [];
+        for ($i = 0; $i < 6; $i++) {
+            $key = $start->copy()->addMonths($i)->format('Y-m');
+            $monthly[] = [
+                'month'     => $key,
+                'total'     => (int) ($createdByMonth[$key] ?? 0),
+                'completed' => (int) ($completedByMonth[$key] ?? 0),
+            ];
+        }
+
+        // Ses types de documents les plus demandés
+        $byType = $mine()
+            ->join('document_types', 'requests.document_type_id', '=', 'document_types.id')
+            ->selectRaw('document_types.nom_fr as label, count(*) as total')
+            ->groupBy('document_types.nom_fr')
+            ->orderByDesc('total')
+            ->limit(5)
+            ->get()
+            ->map(fn ($r) => ['label' => $r->label, 'total' => (int) $r->total]);
+
+        // Délai moyen ressenti : soumission → document disponible
+        $avgCompletion = $mine()
+            ->whereNotNull('completed_at')
+            ->whereNotNull('submitted_at')
+            ->selectRaw('AVG(TIMESTAMPDIFF(HOUR, submitted_at, completed_at)) as v')
+            ->value('v');
+
+        $pending    = $s(RequestStatus::EnAttente);
+        $inProgress = $s(RequestStatus::EnCours);
+
+        $kpis = [
+            'total_requests'      => (int) $statusCounts->sum(),
+            'drafts'              => $s(RequestStatus::Brouillon),
+            'pending'             => $pending,
+            'in_progress'         => $inProgress,
+            'in_flight'           => $pending + $inProgress,
+            'validated'           => $s(RequestStatus::Validee),
+            'rejected'            => $s(RequestStatus::Rejetee),
+            'cancelled'           => $s(RequestStatus::Annulee),
+            'available'           => $available,
+            'avg_completion_hours' => round((float) ($avgCompletion ?? 0), 1),
+        ];
+
         return response()->json([
-            'total_requests'       => $statusCounts->sum(),
-            'by_status'            => $statusCounts,
-            'documents_available'  => $available,
-            'unread_notifications' => $unreadNotifications,
+            'total_requests'        => $kpis['total_requests'],
+            'by_status'             => $statusCounts,
+            'documents_available'   => $available,
+            'unread_notifications'  => $unreadNotifications,
+            'recent_notifications'  => $recentNotifications,
+            'kpis'                  => $kpis,
+            'monthly_requests'      => $monthly,
+            'requests_by_type'      => $byType,
         ]);
     }
 

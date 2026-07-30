@@ -6,6 +6,7 @@ use App\Enums\RequestStatus;
 use App\Http\Controllers\Controller;
 use App\Models\DocumentRequest;
 use App\Models\DocumentType;
+use App\Models\User;
 use App\Services\AuditService;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
@@ -40,13 +41,35 @@ class RequestController extends Controller
     {
         $user = Auth::user();
 
-        $query = DocumentRequest::with(['requester.staffProfile', 'documentType'])
-            ->when(! $user->isAdmin(), fn ($q) => $q->where('requester_id', $user->id))
-            ->when($request->status, fn ($q) => $q->where('status', $request->status))
-            ->when($request->document_type_id, fn ($q) => $q->where('document_type_id', $request->document_type_id))
-            ->latest();
+        $sort = in_array($request->sort, ['created_at', 'submitted_at', 'reference'], true)
+            ? $request->sort
+            : 'created_at';
+        $direction = $request->direction === 'asc' ? 'asc' : 'desc';
 
-        return response()->json($query->paginate(20));
+        $query = DocumentRequest::with(['requester.staffProfile', 'documentType', 'files'])
+            ->when(! $user->isAdmin(), fn ($q) => $q->where('requester_id', $user->id))
+            // status accepte une valeur simple ou une liste (status[]=EN_ATTENTE&status[]=EN_COURS),
+            // afin qu'un KPI agrégeant plusieurs statuts renvoie exactement les mêmes demandes.
+            ->when($request->status, function ($q) use ($request) {
+                $statuses = array_filter((array) $request->status);
+
+                count($statuses) > 1
+                    ? $q->whereIn('status', $statuses)
+                    : $q->where('status', reset($statuses));
+            })
+            ->when($request->document_type_id, fn ($q) => $q->where('document_type_id', $request->document_type_id))
+            ->when($request->search, function ($q) use ($request) {
+                $term = '%' . str_replace(['%', '_'], ['\%', '\_'], trim($request->search)) . '%';
+
+                $q->where(fn ($sub) => $sub
+                    ->where('reference', 'like', $term)
+                    ->orWhereHas('documentType', fn ($t) => $t
+                        ->where('nom_fr', 'like', $term)
+                        ->orWhere('code', 'like', $term)));
+            })
+            ->orderBy($sort, $direction);
+
+        return response()->json($query->paginate(20)->withQueryString());
     }
 
     public function store(Request $request): JsonResponse
@@ -166,7 +189,20 @@ class RequestController extends Controller
                 $dr->requester,
                 'request.submitted',
                 'Demande soumise',
-                "Votre demande {$dr->reference} a été soumise et est en attente de traitement."
+                "Votre demande {$dr->reference} a été soumise et est en attente de traitement.",
+                ['request_id' => $dr->id, 'reference' => $dr->reference],
+            );
+
+            // Notify admins
+            $nom = $dr->requester->staffProfile
+                ? "{$dr->requester->staffProfile->prenom_fr} {$dr->requester->staffProfile->nom_fr}"
+                : $dr->requester->email;
+            $this->notif->broadcast(
+                User::where('role', 'ADMIN')->where('is_active', true)->get(),
+                'request.submitted',
+                'Nouvelle demande',
+                "{$nom} a soumis la demande {$dr->reference}.",
+                ['request_id' => $dr->id, 'reference' => $dr->reference],
             );
         });
     }
@@ -285,7 +321,8 @@ class RequestController extends Controller
                 $dr->requester,
                 'request.processing',
                 'Demande en cours',
-                "Votre demande {$dr->reference} est en cours de traitement par l'administration."
+                "Votre demande {$dr->reference} est en cours de traitement par l'administration.",
+                ['request_id' => $dr->id, 'reference' => $dr->reference],
             );
         });
     }
@@ -305,7 +342,8 @@ class RequestController extends Controller
                 $dr->requester,
                 'request.validated',
                 'Demande validée',
-                "Votre demande {$dr->reference} a été validée. Le document sera bientôt disponible."
+                "Votre demande {$dr->reference} a été validée. Le document sera bientôt disponible.",
+                ['request_id' => $dr->id, 'reference' => $dr->reference],
             );
         });
     }
@@ -324,7 +362,8 @@ class RequestController extends Controller
                 $dr->requester,
                 'request.rejected',
                 'Demande rejetée',
-                "Votre demande {$dr->reference} a été rejetée : {$data['rejection_reason']}"
+                "Votre demande {$dr->reference} a été rejetée : {$data['rejection_reason']}",
+                ['request_id' => $dr->id, 'reference' => $dr->reference],
             );
         });
     }

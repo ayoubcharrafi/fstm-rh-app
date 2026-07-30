@@ -79,7 +79,7 @@ export default function AdminTemplatesPage() {
 
   return (
     <AppShell>
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Templates de documents</h1>
@@ -98,7 +98,7 @@ export default function AdminTemplatesPage() {
             </div>
             <CardBody>
               <form onSubmit={handleSubmit(d => saveMutation.mutate(d))} className="flex flex-col gap-4">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div className="flex flex-col gap-1">
                     <label className="text-sm font-medium text-gray-700">Type de document *</label>
                     <select
@@ -172,7 +172,7 @@ export default function AdminTemplatesPage() {
         {/* Preview modal */}
         {preview && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="flex h-[80vh] w-full max-w-3xl flex-col rounded-xl bg-white shadow-xl">
+            <div className="flex max-h-[80vh] w-full max-w-3xl flex-col rounded-xl bg-white shadow-xl">
               <div className="flex items-center justify-between border-b px-6 py-4">
                 <p className="font-semibold text-gray-900">Aperçu du template</p>
                 <Button variant="ghost" size="sm" onClick={() => setPreview(null)}>✕ Fermer</Button>

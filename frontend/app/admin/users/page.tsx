@@ -9,6 +9,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { RoleBadge } from '@/components/ui/Badge';
+import { Avatar, ROLE_AVATAR, initialsOf } from '@/components/ui/Avatar';
 import type { Paginated, User } from '@/lib/types';
 
 export default function AdminUsersPage() {
@@ -40,7 +41,7 @@ export default function AdminUsersPage() {
 
   return (
     <AppShell>
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Professeurs & Employés</h1>
@@ -77,15 +78,17 @@ export default function AdminUsersPage() {
             ) : !users.length ? (
               <p className="px-6 py-10 text-center text-sm text-gray-400">Aucun utilisateur trouvé.</p>
             ) : (
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+                {/* Sur écran étroit les colonnes défilent au lieu de déborder de la carte. */}
+                <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-gray-400">
-                    <th className="px-6 py-3">Nom complet</th>
-                    <th className="px-6 py-3">Email</th>
-                    <th className="px-6 py-3">Rôle</th>
-                    <th className="px-6 py-3">Département</th>
-                    <th className="px-6 py-3">Statut</th>
-                    <th className="px-6 py-3">Dernière connexion</th>
+                    <th className="whitespace-nowrap px-6 py-3">Nom complet</th>
+                    <th className="whitespace-nowrap px-6 py-3">Email</th>
+                    <th className="whitespace-nowrap px-6 py-3">Rôle</th>
+                    <th className="whitespace-nowrap px-6 py-3">Département</th>
+                    <th className="whitespace-nowrap px-6 py-3">Statut</th>
+                    <th className="whitespace-nowrap px-6 py-3">Dernière connexion</th>
                     <th className="px-6 py-3"></th>
                   </tr>
                 </thead>
@@ -93,16 +96,24 @@ export default function AdminUsersPage() {
                   {users.map(u => (
                     <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="px-6 py-3">
-                        {u.staff_profile ? (
-                          <div>
-                            <p className="font-medium text-gray-900">{u.staff_profile.prenom_fr} {u.staff_profile.nom_fr}</p>
-                            {u.staff_profile.nom_ar && (
-                              <p className="text-xs text-gray-400" dir="rtl">{u.staff_profile.prenom_ar} {u.staff_profile.nom_ar}</p>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="italic text-gray-400">Sans profil</span>
-                        )}
+                        <div className="flex items-center gap-3">
+                          <Avatar
+                            photoUrl={u.staff_profile?.photo_url}
+                            initials={initialsOf(u)}
+                            size="sm"
+                            className={`h-9 w-9 shrink-0 text-xs ${u.staff_profile?.photo_url ? '' : ROLE_AVATAR[u.role] ?? 'bg-gray-100 text-gray-500'}`}
+                          />
+                          {u.staff_profile ? (
+                            <div className="min-w-0">
+                              <p className="whitespace-nowrap font-medium text-gray-900">{u.staff_profile.prenom_fr} {u.staff_profile.nom_fr}</p>
+                              {u.staff_profile.nom_ar && (
+                                <p className="text-xs text-gray-400" dir="rtl">{u.staff_profile.prenom_ar} {u.staff_profile.nom_ar}</p>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="italic text-gray-400">Sans profil</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-3 text-gray-600">{u.email}</td>
                       <td className="px-6 py-3"><RoleBadge role={u.role} /></td>
@@ -122,14 +133,15 @@ export default function AdminUsersPage() {
                         {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString('fr-FR') : '—'}
                       </td>
                       <td className="px-6 py-3">
-                        <Link href={`/admin/users/${u.id}`} className="text-xs text-blue-600 hover:underline">
+                        <Link href={`/admin/users/${u.id}`} className="whitespace-nowrap text-xs text-blue-600 hover:underline">
                           Fiche
                         </Link>
                       </td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             )}
             {data && data.last_page > 1 && (
               <div className="flex items-center justify-between border-t border-gray-100 px-6 py-3">

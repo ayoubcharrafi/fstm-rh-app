@@ -31,6 +31,34 @@ export interface AuthResponse {
   user: AuthUser;
 }
 
+// ─── Mon compte ───────────────────────────────────────────────────────────────
+export type DeletionStatus = 'EN_ATTENTE' | 'APPROUVEE' | 'REFUSEE';
+
+export interface AccountDeletionRequest {
+  id: number;
+  user_id: number;
+  motif: string;
+  status: DeletionStatus;
+  reponse_admin: string | null;
+  traite_par: number | null;
+  traite_le: string | null;
+  created_at: string;
+  user?: { id: number; email: string; role: Role; staff_profile: StaffProfile | null };
+}
+
+export interface AccountOverview {
+  email: string;
+  role: Role;
+  is_active: boolean;
+  email_notifications: boolean;
+  email_globally_enabled: boolean;
+  last_login_at: string | null;
+  created_at: string;
+  password_min: number;
+  requests_count: number;
+  deletion_request: AccountDeletionRequest | null;
+}
+
 // ─── Referentials ─────────────────────────────────────────────────────────────
 export interface Grade {
   id: number;
@@ -55,7 +83,6 @@ export interface OrganizationalUnit {
 // ─── Profiles ─────────────────────────────────────────────────────────────────
 export interface ProfessorProfile {
   id: number;
-  laboratoire_id: number | null;
   date_prise_fonction: string | null;
   date_habilitation: string | null;
   specialite: string | null;
@@ -76,7 +103,7 @@ export interface EmployeeProfile {
 export interface StaffProfile {
   id: number;
   user_id: number;
-  staff_type: 'PROFESSEUR' | 'EMPLOYE';
+  staff_type: 'PROFESSEUR' | 'EMPLOYE' | 'ADMIN';
   nom_fr: string;
   prenom_fr: string;
   nom_ar: string | null;
@@ -87,6 +114,7 @@ export interface StaffProfile {
   cin: string | null;
   doti: string | null;
   telephone: string | null;
+  fonction: string | null;
   situation_administrative: string | null;
   date_recrutement: string | null;
   photo_path: string | null;
@@ -196,12 +224,34 @@ export interface Paginated<T> {
   total: number;
 }
 
+// GET /notifications enrichit la pagination avec les compteurs globaux, afin que
+// la pastille « non lues » ne se limite pas à la page courante.
+export interface PaginatedNotifications extends Paginated<Notification> {
+  unread_count: number;
+  total_count: number;
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export interface UserDashboard {
   total_requests: number;
   by_status: Partial<Record<RequestStatus, number>>;
   documents_available: number;
   unread_notifications: number;
+  recent_notifications: Notification[];
+  kpis: {
+    total_requests: number;
+    drafts: number;
+    pending: number;
+    in_progress: number;
+    in_flight: number;
+    validated: number;
+    rejected: number;
+    cancelled: number;
+    available: number;
+    avg_completion_hours: number;
+  };
+  monthly_requests: { month: string; total: number; completed: number }[];
+  requests_by_type: { label: string; total: number }[];
 }
 
 export interface AdminDashboard {

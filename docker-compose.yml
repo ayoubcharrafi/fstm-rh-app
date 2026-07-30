@@ -12,6 +12,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     environment:
       APP_URL: http://localhost:8000
       DB_CONNECTION: mysql
@@ -20,6 +22,35 @@ services:
       DB_DATABASE: fst_rh_db
       DB_USERNAME: fst_user
       DB_PASSWORD: fst_password
+      # La configuration mail vient de backend/.env : elle contient des
+      # identifiants SMTP qui n'ont pas leur place dans un fichier versionné.
+      # Mailpit (http://localhost:8025) reste disponible pour tester sans
+      # rien envoyer vers l'extérieur : MAIL_HOST=mailpit, MAIL_PORT=1025.
+
+  # Traite les e-mails de notification en arrière-plan. Sans ce service, les
+  # notifications restent visibles dans la cloche mais aucun e-mail ne part :
+  # les jobs s'accumulent dans la table « jobs ».
+  queue:
+    # Même image que le backend, construite par le service « backend » : le
+    # worker exécute le même code, avec les mêmes extensions PHP.
+    image: fst-rh-app-backend
+    container_name: fst_queue
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: php artisan queue:work --tries=3 --sleep=3 --max-time=3600
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: fst_rh_db
+      DB_USERNAME: fst_user
+      DB_PASSWORD: fst_password
+      # Comme pour le backend, la configuration SMTP vient de backend/.env.
 
   frontend:
     build:
@@ -56,6 +87,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # Boîte mail de test : capture tous les e-mails sortants en local
+  # et les affiche sur http://localhost:8025. Rien ne part vers l'extérieur.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: fst_mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
 
   phpmyadmin:
     image: phpmyadmin:latest

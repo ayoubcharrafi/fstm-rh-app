@@ -2,20 +2,26 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\User\StoreUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
 use App\Models\Setting;
 use App\Models\User;
+use App\Models\UserNotification;
+use App\Mail\AdminPasswordResetMail;
 use App\Services\AuditService;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
 {
-    public function __construct(private AuditService $audit) {}
+    public function __construct(private AuditService $audit, private NotificationService $notifications) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -80,6 +86,68 @@ class UserController extends Controller
         return response()->json($user->fresh());
     }
 
+    /**
+     * Réinitialise le mot de passe d'un agent après vérification du mot de
+     * passe de l'administrateur. Les mots de passe ne sont jamais journalisés.
+     */
+    public function resetPasswordByAdmin(Request $request, User $user): JsonResponse
+    {
+        if (! in_array($user->role, [Role::Professeur, Role::Employe], true)) {
+            return response()->json([
+                'message' => 'Seuls les comptes employé et professeur peuvent être réinitialisés ici.',
+            ], 422);
+        }
+
+        $data = $request->validate([
+            'admin_password'        => ['required', 'string'],
+            'password'              => ['required', 'string', 'min:' . Setting::passwordMin(), 'confirmed'],
+            'password_confirmation' => ['required', 'string'],
+        ]);
+
+        $admin = $request->user();
+
+        if (! Hash::check($data['admin_password'], $admin->password)) {
+            throw ValidationException::withMessages([
+                'admin_password' => ['Le mot de passe administrateur est incorrect.'],
+            ]);
+        }
+
+        if (Hash::check($data['password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'password' => ['Le nouveau mot de passe doit être différent de l’ancien.'],
+            ]);
+        }
+
+        $newPassword = $data['password'];
+        $user->forceFill(['password' => Hash::make($newPassword)])->save();
+
+        // Notification interne sans e-mail de notification standard afin de
+        // ne pas doubler l'envoi. Le mail contenant le nouveau mot de passe est
+        // envoyé séparément ci-dessous.
+        $this->notifications->notifyWithoutEmail(
+            $user,
+            'admin.announcement',
+            'Mot de passe réinitialisé',
+            "Votre mot de passe a été réinitialisé par l'administration.",
+        );
+
+        // Envoi d'un email obligatoire contenant le nouveau mot de passe.
+        Mail::to($user->email)->send(new AdminPasswordResetMail(
+            $user->staffProfile?->prenom_fr,
+            $newPassword,
+        ));
+
+        $this->audit->log(
+            'user.password_reset_by_admin',
+            $user,
+            [],
+            ['password_reset' => true],
+            $request,
+        );
+
+        return response()->json(['message' => 'Mot de passe réinitialisé.']);
+    }
+
     // Profile endpoints (own profile)
     public function profile(Request $request): JsonResponse
     {
@@ -92,17 +160,27 @@ class UserController extends Controller
     public function updateContact(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'telephone' => ['nullable', 'string', 'max:20'],
-            'password'  => ['nullable', 'string', 'min:' . Setting::passwordMin(), 'confirmed'],
+            'telephone'        => ['nullable', 'string', 'max:20'],
+            'current_password' => ['required_with:password', 'string'],
+            'password'         => ['nullable', 'string', 'min:' . Setting::passwordMin(), 'confirmed'],
         ]);
 
         $user = $request->user();
 
-        if (isset($data['password'])) {
+        if (! empty($data['password'])) {
+            // Sans cette vérification, un poste laissé ouvert suffirait
+            // à s'approprier définitivement le compte.
+            if (! Hash::check($data['current_password'], $user->password)) {
+                throw ValidationException::withMessages([
+                    'current_password' => ['Le mot de passe actuel est incorrect.'],
+                ]);
+            }
+
             $user->update(['password' => Hash::make($data['password'])]);
+            $this->audit->log('profile.password_changed', $user, [], [], $request);
         }
 
-        if ($user->staffProfile && isset($data['telephone'])) {
+        if ($user->staffProfile && array_key_exists('telephone', $data)) {
             $user->staffProfile->update(['telephone' => $data['telephone']]);
         }
 
@@ -118,14 +196,24 @@ class UserController extends Controller
             return response()->json(['message' => 'Profile already exists.'], 409);
         }
 
-        $data = $request->validate($this->profileRules($user));
+        // Le type est déduit du rôle du compte, jamais de la requête.
+        $staffType = self::staffTypeFor($user);
+
+        $data = $request->validate($this->selfServiceRules($this->profileRules($user), $user));
+        $data['staff_type'] = $staffType;
 
         $profile = $user->staffProfile()->create($data);
 
-        if ($data['staff_type'] === 'PROFESSEUR') {
-            $profile->professorProfile()->create($request->validate($this->professorRules()));
-        } else {
-            $profile->employeeProfile()->create($request->validate($this->employeeRules()));
+        // Un administrateur n'a pas de dossier RH : ni congés, ni ancienneté.
+        // Aucun sous-profil ne lui est rattaché.
+        if ($staffType === 'PROFESSEUR') {
+            $profile->professorProfile()->create(
+                $request->validate($this->selfServiceRules($this->professorRules()))
+            );
+        } elseif ($staffType === 'EMPLOYE') {
+            $profile->employeeProfile()->create(
+                $request->validate($this->selfServiceRules($this->employeeRules()))
+            );
         }
 
         $this->audit->log('profile.created', $profile, [], $profile->toArray(), $request);
@@ -144,18 +232,31 @@ class UserController extends Controller
         }
 
         $old = $profile->toArray();
-        $data = $request->validate($this->profileRules($user, $profile->id, false));
+
+        // Le staff_type ne se déduit pas de la requête : il est déjà fixé par
+        // l'administration et conditionne le sous-profil à mettre à jour.
+        $data = $request->validate(
+            $this->selfServiceRules($this->profileRules($user, $profile->id, false), $user)
+        );
 
         $profile->update($data);
 
+        // Un profil administrateur n'a pas de sous-profil : le créer ici
+        // réintroduirait les données RH que la migration a justement retirées.
         if ($profile->staff_type === 'PROFESSEUR') {
+            $subRules = $this->selfServiceRules($this->professorRules());
+            $sub = $request->validate($subRules);
+
             $profile->professorProfile
-                ? $profile->professorProfile->update($request->only(array_keys($this->professorRules())))
-                : $profile->professorProfile()->create($request->validate($this->professorRules()));
-        } else {
+                ? $profile->professorProfile->update($sub)
+                : $profile->professorProfile()->create($sub);
+        } elseif ($profile->staff_type === 'EMPLOYE') {
+            $subRules = $this->selfServiceRules($this->employeeRules());
+            $sub = $request->validate($subRules);
+
             $profile->employeeProfile
-                ? $profile->employeeProfile->update($request->only(array_keys($this->employeeRules())))
-                : $profile->employeeProfile()->create($request->validate($this->employeeRules()));
+                ? $profile->employeeProfile->update($sub)
+                : $profile->employeeProfile()->create($sub);
         }
 
         $this->audit->log('profile.updated', $profile, $old, $profile->fresh()->toArray(), $request);
@@ -210,6 +311,49 @@ class UserController extends Controller
         return response()->json($this->loadProfile($profile->fresh()));
     }
 
+    /**
+     * Type de profil déduit du rôle du compte. Un administrateur reçoit son
+     * propre type : le classer parmi les employés lui attachait un dossier RH
+     * (congés, ancienneté, grade) étranger à sa fonction.
+     */
+    public static function staffTypeFor(User $user): string
+    {
+        return match ($user->role) {
+            Role::Professeur => 'PROFESSEUR',
+            Role::Admin      => 'ADMIN',
+            default          => 'EMPLOYE',
+        };
+    }
+
+    /**
+     * Champs administratifs : seule l'administration peut les fixer.
+     * Un agent qui les modifierait lui-même pourrait changer son grade,
+     * son matricule ou s'attribuer des jours de congé.
+     */
+    private const ADMIN_ONLY_FIELDS = [
+        'staff_type', 'cin', 'doti', 'situation_administrative',
+        'date_recrutement', 'grade_id', 'organizational_unit_id',
+        'service_id', 'date_prise_fonction', 'date_habilitation',
+        'date_affectation', 'anciennete', 'solde_conge', 'conge_reporte',
+    ];
+
+    /**
+     * Retire les champs administratifs d'un jeu de règles pour le self-service.
+     * L'administration (StaffProfileController) n'emprunte pas ce chemin.
+     */
+    private function selfServiceRules(array $rules, ?User $user = null): array
+    {
+        $interdits = self::ADMIN_ONLY_FIELDS;
+
+        // La fonction d'un agent relève de son dossier RH (fonction_actuelle) ;
+        // seul un administrateur, qui n'en a pas, renseigne la sienne.
+        if (! $user || ! $user->isAdmin()) {
+            $interdits[] = 'fonction';
+        }
+
+        return array_diff_key($rules, array_flip($interdits));
+    }
+
     private function profileRules($user, ?int $ignoreId = null, bool $creating = true): array
     {
         $cinRule  = 'unique:staff_profiles,cin' . ($ignoreId ? ",{$ignoreId}" : '');
@@ -227,6 +371,7 @@ class UserController extends Controller
             'cin'                    => ['nullable', 'string', 'max:20', $cinRule],
             'doti'                   => ['nullable', 'string', 'max:20', $dotiRule],
             'telephone'              => ['nullable', 'string', 'max:20'],
+            'fonction'               => ['nullable', 'string', 'max:200'],
             'situation_administrative'=> ['nullable', 'string', 'max:100'],
             'date_recrutement'       => ['nullable', 'date'],
             'grade_id'               => ['nullable', 'exists:grades,id'],
@@ -237,7 +382,6 @@ class UserController extends Controller
     private function professorRules(): array
     {
         return [
-            'laboratoire_id'       => ['nullable', 'exists:organizational_units,id'],
             'date_prise_fonction'  => ['nullable', 'date'],
             'date_habilitation'    => ['nullable', 'date'],
             'specialite'           => ['nullable', 'string', 'max:200'],

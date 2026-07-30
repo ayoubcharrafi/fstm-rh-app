@@ -7,7 +7,8 @@ import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { api, getApiError } from '@/lib/api';
-import type { Paginated, Notification as AppNotification } from '@/lib/types';
+import { Avatar } from '@/components/ui/Avatar';
+import type { PaginatedNotifications } from '@/lib/types';
 
 interface NavItem {
   href: string;
@@ -62,34 +63,59 @@ const USER_SUB: NavItem[] = [
 
 const NOTIF_HREFS = new Set(['/notifications', '/admin/notifications']);
 
-export function Sidebar() {
+export function Sidebar({ mobileOpen = false, onNavigate }: {
+  mobileOpen?: boolean;
+  onNavigate?: () => void;
+} = {}) {
   const pathname = usePathname();
   const router   = useRouter();
   const { user, isAdmin, logout } = useAuth();
 
-  // État replié, persisté dans localStorage.
-  const [collapsed, setCollapsed] = useState(false);
+  // État replié, persisté dans localStorage. Ne concerne que le bureau : sous
+  // `lg` la sidebar est un tiroir, dont l'ouverture est pilotée par AppShell.
+  const [collapsedPref, setCollapsedPref] = useState(false);
   useEffect(() => {
-    setCollapsed(localStorage.getItem('sidebar-collapsed') === '1');
+    setCollapsedPref(localStorage.getItem('sidebar-collapsed') === '1');
   }, []);
   const toggleCollapsed = () => {
-    setCollapsed(prev => {
+    setCollapsedPref(prev => {
       const next = !prev;
       localStorage.setItem('sidebar-collapsed', next ? '1' : '0');
       return next;
     });
   };
 
+  // Le tiroir mobile s'ouvre toujours déployé : un rail de 64px n'aurait aucun
+  // sens en superposition. On ignore donc la préférence sous `lg`.
+  const [grandEcran, setGrandEcran] = useState(true);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const sync = () => setGrandEcran(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  const collapsed = collapsedPref && grandEcran;
+
   // Ouvrir le groupe si on est déjà sur une page utilisateur
   const usersGroupActive = pathname.startsWith('/admin/users') || pathname.startsWith('/admin/admins');
   const [usersOpen, setUsersOpen] = useState(usersGroupActive);
 
-  const { data: notifData } = useQuery<Paginated<AppNotification>>({
+  const { data: notifData } = useQuery<PaginatedNotifications>({
     queryKey: ['notifications-count'],
     queryFn: () => api.get('/notifications').then(r => r.data),
     refetchInterval: 30_000,
   });
-  const unread = notifData?.data.filter(n => !n.read_at).length ?? 0;
+  // unread_count est le total serveur — un simple filtre sur data ne compterait
+  // que la première page (20 éléments).
+  const unread = notifData?.unread_count ?? 0;
+
+  const profile = user?.staff_profile;
+  const fullName = profile?.prenom_fr ? `${profile.prenom_fr} ${profile.nom_fr}` : user?.email;
+  const initials = profile?.prenom_fr
+    ? `${profile.prenom_fr[0] ?? ''}${profile.nom_fr?.[0] ?? ''}`.toUpperCase()
+    : (user?.email?.[0] ?? '?').toUpperCase();
 
   const handleLogout = async () => {
     try { await logout(); router.replace('/login'); }
@@ -105,6 +131,7 @@ export function Sidebar() {
       <li>
         <Link
           href={item.href}
+          onClick={onNavigate}
           title={collapsed ? item.label : undefined}
           className={`group relative flex items-center gap-3 rounded-lg py-2 text-sm font-medium transition-colors
             ${collapsed ? 'justify-center px-2' : 'px-3'}
@@ -133,12 +160,17 @@ export function Sidebar() {
   };
 
   return (
-    <aside className={`flex h-screen flex-col border-r border-gray-200 bg-white transition-[width] duration-200 ${collapsed ? 'w-16' : 'w-64'}`}>
+    <aside
+      className={`fixed inset-y-0 left-0 z-50 flex h-screen w-64 flex-col border-r border-gray-200 bg-white
+        transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0 lg:transition-[width]
+        ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
+        ${collapsedPref ? 'lg:w-16' : 'lg:w-64'}`}
+    >
       {collapsed ? (
         <>
           {/* Logo compact + bouton déplier */}
           <div className="flex flex-col items-center gap-2 border-b border-gray-100 px-2 py-4">
-            <Link href={isAdmin() ? '/admin/dashboard' : '/dashboard'} title="FST Mohammedia">
+            <Link href={isAdmin() ? '/admin/dashboard' : '/dashboard'} onClick={onNavigate} title="FST Mohammedia">
               <img src="/logo_fst_mark.png" alt="FST" className="h-8 w-8 object-contain object-left" />
             </Link>
             <button
@@ -158,7 +190,7 @@ export function Sidebar() {
           {/* Logo pleine largeur */}
           <div className="border-b border-gray-100 px-4 pb-3 pt-4">
             <div className="flex items-center justify-between gap-2">
-              <Link href={isAdmin() ? '/admin/dashboard' : '/dashboard'} title="FST Mohammedia" className="block min-w-0">
+              <Link href={isAdmin() ? '/admin/dashboard' : '/dashboard'} onClick={onNavigate} title="FST Mohammedia" className="block min-w-0">
                 <img
                   src="/logo_fst_mark.png"
                   alt="Faculté des Sciences et Techniques de Mohammedia"
@@ -169,7 +201,7 @@ export function Sidebar() {
                 onClick={toggleCollapsed}
                 aria-label="Réduire le menu"
                 title="Réduire le menu"
-                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                className="hidden h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 lg:flex"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
@@ -218,6 +250,7 @@ export function Sidebar() {
                       <li key={sub.href}>
                         <Link
                           href={sub.href}
+                          onClick={onNavigate}
                           className={`flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm font-medium transition-colors
                             ${active ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
                         >
@@ -245,12 +278,13 @@ export function Sidebar() {
       <div className="border-t border-gray-100 p-3">
         {collapsed ? (
           <div className="flex flex-col items-center gap-2">
-            <div
-              className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold
-                ${isAdmin() ? 'bg-purple-100 text-purple-700' : user?.role === 'PROFESSEUR' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}
-              title={user?.email}
-            >
-              {(user?.staff_profile?.prenom_fr?.[0] ?? user?.email?.[0] ?? '?').toUpperCase()}
+            <div title={`${fullName} — ${user?.email}`}>
+              <Avatar
+                photoUrl={profile?.photo_url}
+                initials={initials}
+                size="sm"
+                className={`h-8 w-8 text-xs ${profile?.photo_url ? '' : isAdmin() ? 'bg-purple-100 text-purple-700' : user?.role === 'PROFESSEUR' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}
+              />
             </div>
             <button
               onClick={handleLogout}
@@ -265,17 +299,16 @@ export function Sidebar() {
           </div>
         ) : (
           <>
-            <div className="mb-2 rounded-lg bg-gray-50 px-3 py-2">
-              <p className="truncate text-xs font-medium text-gray-800">
-                {user?.staff_profile
-                  ? `${user.staff_profile.prenom_fr} ${user.staff_profile.nom_fr}`
-                  : user?.email}
-              </p>
-              <p className="truncate text-xs text-gray-400">{user?.email}</p>
-              <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium
-                ${isAdmin() ? 'bg-purple-100 text-purple-700' : user?.role === 'PROFESSEUR' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
-                {user?.role}
-              </span>
+            <div className="mb-2 flex items-center gap-2.5 rounded-lg bg-gray-50 px-3 py-2">
+              <Avatar photoUrl={profile?.photo_url} initials={initials} size="sm" className="h-9 w-9 flex-shrink-0 text-xs" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-gray-800">{fullName}</p>
+                <p className="truncate text-xs text-gray-400">{user?.email}</p>
+                <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium
+                  ${isAdmin() ? 'bg-purple-100 text-purple-700' : user?.role === 'PROFESSEUR' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                  {user?.role}
+                </span>
+              </div>
             </div>
             <button
               onClick={handleLogout}

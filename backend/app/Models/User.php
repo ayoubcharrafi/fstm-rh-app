@@ -19,6 +19,7 @@ class User extends Authenticatable implements JWTSubject
         'password',
         'role',
         'is_active',
+        'email_notifications',
         'last_login_at',
     ];
 
@@ -29,6 +30,7 @@ class User extends Authenticatable implements JWTSubject
         return [
             'role'             => Role::class,
             'is_active'        => 'boolean',
+            'email_notifications' => 'boolean',
             'email_verified_at'=> 'datetime',
             'last_login_at'    => 'datetime',
             'password'         => 'hashed',
